@@ -10,28 +10,11 @@ use std::{
 use toy_arms::external::{read, Process};
 use winapi::um::winnt::HANDLE;
 
+mod offsets;
+use offsets::{RekordboxOffsets, Offset};
 
 
-struct RekordboxOffsets{
-    beat_baseoffset: usize,
-    deck1: usize,
-    deck2: usize,
-    bar: usize,
-    beat: usize,
-    master_bpm: Offset,
-    masterdeck_index: Offset
-}
 
-struct Offset{
-    offests: Vec<usize>,
-    final_offset: usize
-}
-
-impl Offset{
-    fn new(offests: Vec<usize>, final_offset: usize) -> Offset{
-        Offset { offests, final_offset }
-    }
-}
 
 struct Value<T> {
     address: usize,
@@ -40,13 +23,13 @@ struct Value<T> {
 }
 
 impl<T> Value<T> {
-    fn new(h: HANDLE, base: usize, offsets: &[usize], final_offset: usize) -> Value<T> {
+    fn new(h: HANDLE, base: usize, offsets: Offset) -> Value<T> {
         let mut address = base;
 
-        for offset in offsets {
+        for offset in offsets.offsets {
             address = read::<usize>(h, address + offset).unwrap();
         }
-        address += final_offset;
+        address += offsets.final_offset;
 
         Value::<T> {
             address,
@@ -91,19 +74,17 @@ impl Rekordbox {
         //println!("Base: {:X}", base);
 
         let master_bpm_val: Value<f32> =
-            Value::new(h, base, &[0x0434A4F0, 0x18, 0x110, 0x0, 0x70], 0x158);
+            Value::new(h, base, offsets.master_bpm);
         //println!("{}", master_bpm_val.read());
 
-        const BEAT_BASEOFFSET: usize = 0x043498E0;
-        let bar1_val: Value<i32> = Value::new(h, base, &[BEAT_BASEOFFSET, 0x118], 0x1e18);
-        let beat1_val: Value<i32> = Value::new(h, base, &[BEAT_BASEOFFSET, 0x118], 0x1e1c);
-
-        let bar2_val: Value<i32> = Value::new(h, base, &[BEAT_BASEOFFSET, 0x120], 0x1e18);
-        let beat2_val: Value<i32> = Value::new(h, base, &[BEAT_BASEOFFSET, 0x120], 0x1e1c);
+        let bar1_val: Value<i32> = Value::new(h, base, Offset::new(vec![offsets.beat_baseoffset, offsets.deck1], offsets.bar));
+        let beat1_val: Value<i32> = Value::new(h, base, Offset::new(vec![offsets.beat_baseoffset, offsets.deck1], offsets.beat));
+        let bar2_val: Value<i32> = Value::new(h, base, Offset::new(vec![offsets.beat_baseoffset, offsets.deck2], offsets.bar));
+        let beat2_val: Value<i32> = Value::new(h, base, Offset::new(vec![offsets.beat_baseoffset, offsets.deck2], offsets.beat));
 
         // println!("{}.{}   {}.{}", bar1_val.read(), beat1_val.read(), bar2_val.read(), beat2_val.read());
 
-        let masterdeck_index: Value<u8> = Value::new(h, base, &[0x043498E0, 0x90], 0x19C);
+        let masterdeck_index_val: Value<u8> = Value::new(h, base, offsets.masterdeck_index);
         //println!("{}", masterdeck_index.read());
 
         Self {
@@ -113,7 +94,7 @@ impl Rekordbox {
             bar2_val,
             beat2_val,
 
-            masterdeck_index_val: masterdeck_index,
+            masterdeck_index_val,
 
             beats1: -1,
             beats2: -1,
@@ -145,9 +126,9 @@ pub struct BeatKeeper {
 }
 
 impl BeatKeeper {
-    pub fn new() -> Self {
+    pub fn new(offsets: RekordboxOffsets) -> Self {
         BeatKeeper {
-            rb: Some(Rekordbox::new()),
+            rb: Some(Rekordbox::new(offsets)),
             last_beat: 0,
             beat_fraction: 1.,
             last_masterindex: 0,
@@ -191,17 +172,36 @@ const CHARS: [&str; 4] = ["|", "/", "-", "\\"];
 
 fn main() {
     let args: Vec<String> = env::args().collect();
+    
+    let versions = RekordboxOffsets::get_available_versions();
 
-    if args.len() < 2 {
+    if args.len() < 3 {
         println!(
             "Too few arguments!
 
  - Rekordbox OSC v0.1.0 -
 A tool for sending Rekordbox timing data to visualizers using OSC
-Usage: rkbox_osc.exe [source IP] [target IP] <Rekordbox version>"
-        );
+Usage: rkbox_osc.exe [source IP] [target IP] <Rekordbox version>
+
+Current default version: {}
+Available versions:",
+        RekordboxOffsets::default_version());
+        for v in versions.keys(){
+            print!("{v}, ");
+        }
+        println!();
         return;
     }
+    
+    let version = if args.len() > 3 {&args[3]}else{RekordboxOffsets::default_version()};
+
+    let offsets = if let Some(offsets) = versions.get(version){
+        offsets
+    }else{
+        println!("Unsupported version! {version}");
+        return;
+    };
+    println!("Targeting Rekordbox version {version}");
 
     //let args = ["192.168.1.221:1337", "192.168.1.38:6669"];//.iter().map(|x|{x.to_string()}).collect();
 
@@ -211,7 +211,7 @@ Usage: rkbox_osc.exe [source IP] [target IP] <Rekordbox version>"
     let socket = UdpSocket::bind(&args[1]).unwrap();
     socket.connect(&args[2]).unwrap();
 
-    let mut keeper = BeatKeeper::new();
+    let mut keeper = BeatKeeper::new(offsets.clone());
 
     let period = Duration::from_millis(1000 / 60);
 

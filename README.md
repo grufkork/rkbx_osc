@@ -2,6 +2,14 @@
 A tiny tool for sending Rekordbox timing information to visualizers etc. over OSC. 
 Currently an MVP, with future functions including sending more information and better UX.
 
+## What does it do?
+When run on the same computer as a Rekordbox instance, it will send the current beat fraction on OSC address `/beat` to the specified target IP. This can be received by, for instance, a visualiser and drive an animation. The value is a float, set to zero on the beat and increasing to 1 just before the next beat. It should send updates at approximately 60Hz. 
+
+The program does not interact with the audio stream in any way, but reads the onscreen text values through memory. Thus your beatgrid must be correct for it to work as expected. 
+
+## Why?
+Rekordbox's Ableton Link integration leaves some to be desired.
+
 ## Usage
 `rkbx_osc.exe [Source IP] [Target IP] <Rekordbox version>`
 
@@ -17,8 +25,9 @@ When a change occurs, the beat fraction is set to 0 and then counts linearly upw
 
 ## Limitations
 - Only supports two decks.
-- Might register extra beats when switching decks as master
+- Might register extra beats when switching master deck
 - Assumes 4/4 time signature. (Does Rekordbox support anything else? 3/4 and lower shoud work OK, 5/4 and higher might behave strangely)
+- Windows only
 
 ## Updating
 Every Rekordbox update the memory offsets change. Some have proven to remain the same, but usually the first offsets in the paths require updating. 

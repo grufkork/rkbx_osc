@@ -11,13 +11,17 @@ The program does not interact with the audio stream in any way, but reads the on
 Rekordbox's Ableton Link integration leaves some to be desired.
 
 ## Usage
-`rkbx_osc.exe [Source IP] [Target IP] <Rekordbox version>`
-
-IP's are required, version defaults to latest available version. Parameters are given as strings like so: `rkbx_osc.exe 127.0.0.1:1337 127.0.0.1:6669 6.7.3`
+`rkbx_osc.exe [flags]`
+where
+```
+ -s  Source address, eg. 127.0.0.1:1337
+ -t  Target address, eg. 192.168.1.56:6667
+ -v  Rekordbox version to target, eg. 6.7.3
+ -h  Print help and available versions
+```
+If no arguments are given, it defaults to the latest supported rekordbox version and sending to 127.0.0.1:6669. As messages are sent with UDP, source address should not need to be set.
 
 The program will then send the current beat fraction, as a float counting from 0 to 1, to the OSC address `/beat`.
-
-Run without arguments to list available Rekordbox versions. 
 
 ## How it works
 The timing information is extracted through reading Rekordbox's memory. The program reads the current beat and measure from the text display on top of the large waveform, and detects when these change.
@@ -44,3 +48,4 @@ Updates are welcome, put them in the `offsets.rs` file.
 | Rekordbox Version  | Verified? |
 | ----- | --- |
 | 6.7.3 | ✔️ |
+| 6.7.4 | ✔️ |

@@ -216,10 +216,9 @@ fn main() {
 
     let args: Vec<String> = env::args().collect();
 
-    let mut source_address = "127.0.0.1:1337".to_string();
+    let mut source_address = "0.0.0.0:0".to_string();
     let mut target_address = "127.0.0.1:6669".to_string();
     let mut version = RekordboxOffsets::default_version().to_string();
-    //let mut d = ""
 
     let versions = RekordboxOffsets::get_available_versions();
 
@@ -274,25 +273,6 @@ Available versions:",
         }
     }
 
-    /*if args.len() < 3 {
-            println!(
-                "Too few arguments!
-
-     - Rekordbox OSC v0.1.0 -
-    A tool for sending Rekordbox timing data to visualizers using OSC
-    Usage: rkbox_osc.exe [source IP] [target IP] <Rekordbox version>
-
-    Current default version: {}
-    Available versions:",
-            RekordboxOffsets::default_version());
-            for v in versions.keys(){
-                print!("{v}, ");
-            }
-            println!();
-            return;
-        }*/
-
-    //let version = if args.len() > 3 {&args[3]}else{RekordboxOffsets::default_version()};
 
     let offsets = if let Some(offsets) = versions.get(version.as_str()) {
         offsets
@@ -302,13 +282,11 @@ Available versions:",
     };
     println!("Targeting Rekordbox version {version}");
 
-    //let args = ["192.168.1.221:1337", "192.168.1.38:6669"];//.iter().map(|x|{x.to_string()}).collect();
-
     println!("Connecting from: {}", source_address);
     println!("Connecting to:   {}", target_address);
 
     println!("");
-    println!("Press i/k to change offset in milliseconds. c to quit.");
+    println!("Press i/k to change offset in milliseconds. c to quit. -h for help and version info.");
     println!("");
 
     let socket = match UdpSocket::bind(&source_address) {

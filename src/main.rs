@@ -378,6 +378,6 @@ Available versions:",
         }
         count = (count + 1) % 120;
 
-        sleep(period);
+        sleep(period - (Instant::now() - last_instant));
     }
 }

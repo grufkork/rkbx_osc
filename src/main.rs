@@ -285,19 +285,16 @@ Available versions:",
     println!("Connecting from: {}", source_address);
     println!("Connecting to:   {}", target_address);
 
-    println!("");
+    println!();
     println!(
         "Press i/k to change offset in milliseconds. c to quit. -h flag for help and version info."
     );
-    println!("");
+    println!();
 
     let socket = match UdpSocket::bind(&source_address) {
         Ok(socket) => socket,
         Err(e) => {
-            println!(
-                "Failed to bind to address {source_address}. Error:\n{}",
-                e.to_string()
-            );
+            println!("Failed to bind to address {source_address}. Error:\n{}", e);
             return;
         }
     };
@@ -306,7 +303,7 @@ Available versions:",
         Err(e) => {
             println!(
                 "Failed to open socket to address {target_address}. Error:\n{}",
-                e.to_string()
+                e
             );
             return;
         }

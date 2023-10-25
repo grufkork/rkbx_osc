@@ -39,10 +39,19 @@ To find these, I use Cheatengine, using pointerscans and trying to find the shor
 
 Updates are welcome, put them in the `offsets.rs` file.
 
-- `master_bpm` - The BPM value of the current master track. Find by loading a track on deck 1 & 2, then search for a float containing the BPM of the deck currently set as Master.
-- `masterdeck_index` - The index of the deck currently set as Master. 0 for deck 1, 1 for deck 2. Not sure if the value I've found is the index of the selected deck, or a boolean dictating if Deck 2 is master. Search for a byte.
-- `beat_baseoffset` - The first value in the path to find the measure/beat displayed on the large waveform as "measure.beat". Search for 32-bit ints
-- `deck1, deck2, bar, beat` - Appear to remain the same. These are offsets added to `beat_baseoffset` to find the specific values.
+### `master_bpm`
+The BPM value of the current master track. Find by loading a track on deck 1 & 2, then search for a float containing the BPM of the deck currently set as Master.
+
+### `masterdeck_index`
+The index of the deck currently set as Master. 0 for deck 1, 1 for deck 2. Not sure if the value I've found is the index of the selected deck, or a boolean dictating if Deck 2 is master. Search for a byte.
+
+This one is usually the trickiest. There are a couple of other values wich correlate but actually change on hover etc., so be careful. The path should not be longer than 4 addresses, so find a bunch of candidates (should be able to reduce to <30) and then pointer scan for each until you get a short one - that should be it.
+
+### `beat_baseoffset`
+The first value in the path to find the measure/beat displayed on the large waveform as "measure.beat". Search for 32-bit ints
+
+### `deck1, deck2, bar, beat`
+Appear to remain the same. These are offsets added to `beat_baseoffset` to find the specific values.
 
 ## Supported versions
 Any version not listed will 99% not work, but you can always try using an adjacent version.

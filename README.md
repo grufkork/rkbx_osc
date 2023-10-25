@@ -45,7 +45,10 @@ Updates are welcome, put them in the `offsets.rs` file.
 - `deck1, deck2, bar, beat` - Appear to remain the same. These are offsets added to `beat_baseoffset` to find the specific values.
 
 ## Supported versions
+Any version not listed will 99% not work, but you can always try using an adjacent version.
+
 | Rekordbox Version  | Verified? |
 | ----- | --- |
-| 6.7.3 | ✔️ |
+| 6.7.7 | ✔️ |
 | 6.7.4 | ✔️ |
+| 6.7.3 | ✔️ |

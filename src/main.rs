@@ -33,7 +33,8 @@ impl<T> Value<T> {
         let mut address = base;
 
         for offset in offsets.offsets {
-            address = read::<usize>(h, address + offset).expect("Memory read failed, check your Rekordbox version!");
+            address = read::<usize>(h, address + offset)
+                .expect("Memory read failed, check your Rekordbox version!");
         }
         address += offsets.final_offset;
 
@@ -273,7 +274,6 @@ Available versions:",
         }
     }
 
-
     let offsets = if let Some(offsets) = versions.get(version.as_str()) {
         offsets
     } else {
@@ -286,7 +286,9 @@ Available versions:",
     println!("Connecting to:   {}", target_address);
 
     println!("");
-    println!("Press i/k to change offset in milliseconds. c to quit. -h for help and version info.");
+    println!(
+        "Press i/k to change offset in milliseconds. c to quit. -h flag for help and version info."
+    );
     println!("");
 
     let socket = match UdpSocket::bind(&source_address) {

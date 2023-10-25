@@ -2,22 +2,21 @@ use std::collections::HashMap;
 
 impl RekordboxOffsets {
     pub fn default_version() -> &'static str {
-        "6.7.4"
+        "6.7.7"
     }
 
     pub fn get_available_versions() -> HashMap<&'static str, RekordboxOffsets> {
         let mut map = HashMap::new();
-
         map.insert(
-            "6.7.3",
+            "6.7.7",
             RekordboxOffsets {
-                beat_baseoffset: 0x043498e0,
-                deck1: 0x118,
-                deck2: 0x120,
+                beat_baseoffset: 0x043BB250,
+                deck1: 0x120,
+                deck2: 0x128,
                 bar: 0x1e18,
                 beat: 0x1e1c,
-                master_bpm: Offset::new(vec![0x0434A4F0, 0x18, 0x110, 0x0, 0x70], 0x158),
-                masterdeck_index: Offset::new(vec![0x043498e0, 0x90], 0x19c),
+                master_bpm: Offset::new(vec![0x043BBE60, 0x28, 0x208, 0x1d8], 0x140),
+                masterdeck_index: Offset::new(vec![0x043BB250, 0x18, 0x720], 0x1058),
             },
         );
 
@@ -31,6 +30,19 @@ impl RekordboxOffsets {
                 beat: 0x1e1c,
                 master_bpm: Offset::new(vec![0x0434c088, 0xe8, 0x1c0, 0x0], 0xb48),
                 masterdeck_index: Offset::new(vec![0x04393430, 0x0, 0x58, 0x0, 0x530, 0x80], 0x144),
+            },
+        );
+
+        map.insert(
+            "6.7.3",
+            RekordboxOffsets {
+                beat_baseoffset: 0x043498e0,
+                deck1: 0x118,
+                deck2: 0x120,
+                bar: 0x1e18,
+                beat: 0x1e1c,
+                master_bpm: Offset::new(vec![0x0434A4F0, 0x18, 0x110, 0x0, 0x70], 0x158),
+                masterdeck_index: Offset::new(vec![0x043498e0, 0x90], 0x19c),
             },
         );
 

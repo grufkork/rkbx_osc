@@ -146,6 +146,7 @@ pub struct BeatKeeper {
     pub beat_fraction: f32,
     pub last_masterindex: u8,
     pub offset_micros: f32,
+    pub last_bpm: f32,
 }
 
 impl BeatKeeper {
@@ -156,6 +157,7 @@ impl BeatKeeper {
             beat_fraction: 1.,
             last_masterindex: 0,
             offset_micros: 0.,
+            last_bpm: 0.,
         }
     }
 
@@ -166,15 +168,13 @@ impl BeatKeeper {
             beat_fraction: 1.,
             last_masterindex: 0,
             offset_micros: 0.,
+            last_bpm: 0.,
         }
     }
 
     pub fn update(&mut self, delta: Duration) {
         if let Some(rb) = &mut self.rb {
             let beats_per_micro = rb.master_bpm / 60. / 1000000.;
-
-            self.beat_fraction =
-                (self.beat_fraction + delta.as_micros() as f32 * beats_per_micro) % 1.;
 
             rb.update();
 
@@ -187,6 +187,8 @@ impl BeatKeeper {
                 self.last_beat = rb.master_beats;
                 self.beat_fraction = 0.;
             }
+            self.beat_fraction =
+                (self.beat_fraction + delta.as_micros() as f32 * beats_per_micro) % 1.;
         } else {
             self.beat_fraction = (self.beat_fraction + delta.as_secs_f32() * 130. / 60.) % 1.;
         }
@@ -198,8 +200,19 @@ impl BeatKeeper {
                 self.offset_micros * beats_per_micro
             } else {
                 0.
-            })
+            }
+            + 1.)
             % 1.
+    }
+
+    pub fn get_bpm_changed(&mut self) -> Option<f32> {
+        if let Some(rb) = &self.rb {
+            if rb.master_bpm != self.last_bpm {
+                self.last_bpm = rb.master_bpm;
+                return Some(rb.master_bpm);
+            }
+        }
+        None
     }
 
     pub fn change_beat_offset(&mut self, offset: f32) {
@@ -311,7 +324,9 @@ Available versions:",
 
     let mut keeper = BeatKeeper::new(offsets.clone());
 
-    let period = Duration::from_millis(1000 / 60);
+    // Due to Windows timers having a default resolution 0f 15.6ms, we need to use a "too high"
+    // value to acheive ~60Hz
+    let period = Duration::from_micros(1000000 / 120);
 
     let mut last_instant = Instant::now();
 
@@ -327,12 +342,23 @@ Available versions:",
 
         keeper.update(delta);
 
+        let bfrac = keeper.get_beat_faction();
+
         let msg = OscPacket::Message(OscMessage {
             addr: "/beat".to_string(),
-            args: vec![OscType::Float(keeper.get_beat_faction())],
+            args: vec![OscType::Float(bfrac)],
         });
         let packet = encode(&msg).unwrap();
         socket.send(&packet[..]).unwrap();
+
+        if let Some(bpm) = keeper.get_bpm_changed() {
+            let msg = OscPacket::Message(OscMessage {
+                addr: "/bpm".to_string(),
+                args: vec![OscType::Float(bpm)],
+            });
+            let packet = encode(&msg).unwrap();
+            socket.send(&packet[..]).unwrap();
+        }
 
         while let Ok(key) = rx.try_recv() {
             match key {
@@ -356,7 +382,7 @@ Available versions:",
             let frac = (keeper.last_beat - 1) % 4;
 
             print!(
-                "\rRunning {} [{}] Deck {}     Offset: {}ms       ",
+                "\rRunning {} [{}] Deck {}     Offset: {}ms     Frq: {}Hz    ",
                 CHARS[step],
                 (0..4)
                     .map(|i| {
@@ -368,13 +394,14 @@ Available versions:",
                     })
                     .collect::<String>(),
                 keeper.last_masterindex,
-                keeper.offset_micros / 1000.
+                keeper.offset_micros / 1000.,
+                1000000 / (delta.as_micros().max(1)),
             );
 
             stdout.flush().unwrap();
         }
         count = (count + 1) % 120;
 
-        sleep(period - (Instant::now() - last_instant));
+        sleep(period);
     }
 }

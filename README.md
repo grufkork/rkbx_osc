@@ -21,7 +21,9 @@ where
 ```
 If no arguments are given, it defaults to the latest supported rekordbox version and sending to 127.0.0.1:6669. As messages are sent with UDP, source address should not need to be set.
 
-The program will then send the current beat fraction, as a float counting from 0 to 1, to the OSC address `/beat`.
+The program will then send:
+ - the current beat fraction, as a float counting from 0 to 1, to the OSC address `/beat`
+ - the master deck tempo in BPM on OSC address `/bpm`
 
 ## How it works
 The timing information is extracted through reading Rekordbox's memory. The program reads the current beat and measure from the text display on top of the large waveform, and detects when these change.
@@ -33,6 +35,16 @@ When a change occurs, the beat fraction is set to 0 and then counts linearly upw
 - Assumes 4/4 time signature. (Does Rekordbox support anything else? 3/4 and lower shoud work OK, 5/4 and higher might behave strangely)
 - Windows only
 
+## Supported versions
+Any version not listed will 99% not work, but you can always try using an adjacent version.
+
+| Rekordbox Version  | Verified? |
+| ----- | --- |
+| 6.7.7 | ✔️ |
+| 6.7.4 | ✔️ |
+| 6.7.3 | ✔️ |
+
+# Technical Details
 ## Updating
 Every Rekordbox update the memory offsets change. Some have proven to remain the same, but usually the first offsets in the paths require updating. 
 To find these, I use Cheatengine, using pointerscans and trying to find the shortest pointer paths.
@@ -53,11 +65,5 @@ The first value in the path to find the measure/beat displayed on the large wave
 ### `deck1, deck2, bar, beat`
 Appear to remain the same. These are offsets added to `beat_baseoffset` to find the specific values.
 
-## Supported versions
-Any version not listed will 99% not work, but you can always try using an adjacent version.
-
-| Rekordbox Version  | Verified? |
-| ----- | --- |
-| 6.7.7 | ✔️ |
-| 6.7.4 | ✔️ |
-| 6.7.3 | ✔️ |
+## Notes on timing
+Windows, by default, only has sleeps in increments of ~16ms. As such, the the sending frequency is a bit uneven. The rate is set to 120Hz in the code, but that results in about 60Hz update rate.

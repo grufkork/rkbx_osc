@@ -2,11 +2,25 @@ use std::collections::HashMap;
 
 impl RekordboxOffsets {
     pub fn default_version() -> &'static str {
-        "6.7.7"
+        "6.8.2"
     }
 
     pub fn get_available_versions() -> HashMap<&'static str, RekordboxOffsets> {
         let mut map = HashMap::new();
+
+        map.insert(
+            "6.8.2",
+            RekordboxOffsets {
+                beat_baseoffset: 0x043FB790,
+                deck1: 0x120,
+                deck2: 0x128,
+                bar: 0x1e18,
+                beat: 0x1e1c,
+                master_bpm: Offset::new(vec![0x043FC3A0, 0x18, 0xF8, 0x0], 0x128),
+                masterdeck_index: Offset::new(vec![0x04399C88, 0x20, 0x278], 0xe18),
+            },
+        );
+
         map.insert(
             "6.7.7",
             RekordboxOffsets {

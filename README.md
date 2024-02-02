@@ -40,6 +40,7 @@ Any version not listed will 99% not work, but you can always try using an adjace
 
 | Rekordbox Version  | Verified? |
 | ----- | --- |
+| 6.8.2 | ✔️ |
 | 6.7.7 | ✔️ |
 | 6.7.4 | ✔️ |
 | 6.7.3 | ✔️ |
@@ -48,6 +49,8 @@ Any version not listed will 99% not work, but you can always try using an adjace
 ## Updating
 Every Rekordbox update the memory offsets change. Some have proven to remain the same, but usually the first offsets in the paths require updating. 
 To find these, I use Cheatengine, using pointerscans and trying to find the shortest pointer paths.
+
+Easiest method seems to be to find each value, pointerscan, save that, then reopen rekordbox and filter the pointerscans by value.
 
 Updates are welcome, put them in the `offsets.rs` file.
 
@@ -60,7 +63,7 @@ The index of the deck currently set as Master. 0 for deck 1, 1 for deck 2. Not s
 This one is usually the trickiest. There are a couple of other values wich correlate but actually change on hover etc., so be careful. The path should not be longer than 4 addresses, so find a bunch of candidates (should be able to reduce to <30) and then pointer scan for each until you get a short one - that should be it.
 
 ### `beat_baseoffset`
-The first value in the path to find the measure/beat displayed on the large waveform as "measure.beat". Search for 32-bit ints
+The first value in the path to any of the measure/beat displays at the top of the large waveform, shown as "measure.beat". Search for 32-bit ints
 
 ### `deck1, deck2, bar, beat`
 Appear to remain the same. These are offsets added to `beat_baseoffset` to find the specific values.

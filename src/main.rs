@@ -142,9 +142,10 @@ impl Rekordbox {
 
 pub struct BeatKeeper {
     rb: Option<Rekordbox>,
-    last_beat: i32,
+    beat_index: i32,
+    last_beat_index: i32,
     pub beat_fraction: f32,
-    pub last_masterindex: u8,
+    pub masterindex: u8,
     pub offset_micros: f32,
     pub last_bpm: f32,
 }
@@ -153,9 +154,10 @@ impl BeatKeeper {
     pub fn new(offsets: RekordboxOffsets) -> Self {
         BeatKeeper {
             rb: Some(Rekordbox::new(offsets)),
-            last_beat: 0,
+            beat_index: 0,
+            last_beat_index: 0,
             beat_fraction: 1.,
-            last_masterindex: 0,
+            masterindex: 0,
             offset_micros: 0.,
             last_bpm: 0.,
         }
@@ -164,9 +166,10 @@ impl BeatKeeper {
     pub fn dummy() -> Self {
         BeatKeeper {
             rb: None,
-            last_beat: 0,
+            beat_index: 0,
+            last_beat_index: 0,
             beat_fraction: 1.,
-            last_masterindex: 0,
+            masterindex: 0,
             offset_micros: 0.,
             last_bpm: 0.,
         }
@@ -178,13 +181,15 @@ impl BeatKeeper {
 
             rb.update();
 
-            if rb.masterdeck_index != self.last_masterindex {
-                self.last_masterindex = rb.masterdeck_index;
-                self.last_beat = rb.master_beats;
+            self.last_beat_index = self.beat_index;
+
+            if rb.masterdeck_index != self.masterindex {
+                self.masterindex = rb.masterdeck_index;
+                self.beat_index = rb.master_beats;
             }
 
-            if (rb.master_beats - self.last_beat).abs() > 0 {
-                self.last_beat = rb.master_beats;
+            if (rb.master_beats - self.beat_index).abs() > 0 {
+                self.beat_index = rb.master_beats;
                 self.beat_fraction = 0.;
             }
             self.beat_fraction =
@@ -196,11 +201,11 @@ impl BeatKeeper {
     pub fn get_beat_faction(&mut self) -> f32 {
         (self.beat_fraction
             + if let Some(rb) = &self.rb {
-                let beats_per_micro = rb.master_bpm / 60. / 1000000.;
-                self.offset_micros * beats_per_micro
-            } else {
-                0.
-            }
+            let beats_per_micro = rb.master_bpm / 60. / 1000000.;
+            self.offset_micros * beats_per_micro
+        } else {
+            0.
+        }
             + 1.)
             % 1.
     }
@@ -233,6 +238,7 @@ fn main() {
     let mut source_address = "0.0.0.0:0".to_string();
     let mut target_address = "127.0.0.1:6669".to_string();
     let mut version = RekordboxOffsets::default_version().to_string();
+    let mut max_value: f32 = 1.0;
 
     let versions = RekordboxOffsets::get_available_versions();
 
@@ -253,6 +259,9 @@ fn main() {
                         "v" => {
                             version = args_iter.next().unwrap().to_string();
                         }
+                        "m" => {
+                            max_value = args_iter.next().unwrap().to_string().parse::<f32>().unwrap();
+                        }
                         "h" => {
                             println!(
                                 " - Rekordbox OSC v0.1.0 -
@@ -263,6 +272,7 @@ Flags:
  -s  Source address, eg. 127.0.0.1:1337
  -t  Target address, eg. 192.168.1.56:6667
  -v  Rekordbox version to target, eg. 6.7.3
+ -m  Maximum value to be transmitted over OSC, eg. 255.0
  -h  Print this help
 
 Use i/k to change the beat offset by +/- 1ms
@@ -297,6 +307,7 @@ Available versions:",
 
     println!("Connecting from: {}", source_address);
     println!("Connecting to:   {}", target_address);
+    println!("Maximum value:   {}", max_value);
 
     println!();
     println!(
@@ -346,7 +357,7 @@ Available versions:",
 
         let msg = OscPacket::Message(OscMessage {
             addr: "/beat".to_string(),
-            args: vec![OscType::Float(bfrac)],
+            args: vec![OscType::Float(bfrac * max_value)],
         });
         let packet = encode(&msg).unwrap();
         socket.send(&packet[..]).unwrap();
@@ -359,6 +370,40 @@ Available versions:",
             let packet = encode(&msg).unwrap();
             socket.send(&packet[..]).unwrap();
         }
+
+        let beat_change = keeper.last_beat_index != keeper.beat_index;
+
+        let msg = OscPacket::Message(OscMessage {
+            addr: "/beat_change".to_string(),
+            args: vec![OscType::Float(if beat_change {1.0} else {0.0})],
+        });
+        let packet = encode(&msg).unwrap();
+        socket.send(&packet[..]).unwrap();
+
+        let msg = OscPacket::Message(OscMessage {
+            addr: "/bar".to_string(),
+            args: vec![OscType::Float((((keeper.beat_index as f32) - 1.0) % 4.0) / 3.0)],
+        });
+        let packet = encode(&msg).unwrap();
+        socket.send(&packet[..]).unwrap();
+
+        if beat_change {
+            for i in 0..4 {
+                let value: f32 = if ((keeper.beat_index - 1) % 4) == i {
+                    max_value
+                } else {
+                    0.0
+                };
+
+                let msg = OscPacket::Message(OscMessage {
+                    addr: format!("{}{}", "/beat", i),
+                    args: vec![OscType::Float(value)],
+                });
+                let packet = encode(&msg).unwrap();
+                socket.send(&packet[..]).unwrap();
+            }
+        }
+
 
         while let Ok(key) = rx.try_recv() {
             match key {
@@ -379,7 +424,7 @@ Available versions:",
         if count % 10 == 0 {
             step = (step + 1) % 4;
 
-            let frac = (keeper.last_beat - 1) % 4;
+            let frac = (keeper.beat_index - 1) % 4;
 
             print!(
                 "\rRunning {} [{}] Deck {}     Offset: {}ms     Frq: {}Hz    ",
@@ -393,7 +438,7 @@ Available versions:",
                         }
                     })
                     .collect::<String>(),
-                keeper.last_masterindex,
+                keeper.masterindex,
                 keeper.offset_micros / 1000.,
                 1000000 / (delta.as_micros().max(1)),
             );

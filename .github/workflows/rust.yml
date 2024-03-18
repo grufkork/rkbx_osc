@@ -27,6 +27,6 @@ jobs:
     - name: Archive artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: dist-without-markdown
+        name: rkbx_osc.exe
         path: |
           target/debug/rkbx_osc.exe

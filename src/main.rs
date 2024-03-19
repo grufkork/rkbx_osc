@@ -8,6 +8,7 @@ use std::{
     thread::{sleep, spawn},
     time::{Duration, Instant},
 };
+use rusty_link::{AblLink, SessionState};
 use toy_arms::external::{read, Process};
 use winapi::um::winnt::HANDLE;
 
@@ -67,21 +68,12 @@ pub struct Rekordbox {
 
 impl Rekordbox {
     fn new(offsets: RekordboxOffsets) -> Self {
-        //println!("Hello, world!");
         let rb = Process::from_process_name("rekordbox.exe").unwrap();
         let h = rb.process_handle;
-        /*println!(
-            "process id = {}, \nprocess handle = {:?}",
-            rb.process_id, h
-        );*/
 
         let base = rb.get_module_base("rekordbox.exe").unwrap();
-        //base = 0x300905A4D;
-        //base = 0x266E1532160;
-        //println!("Base: {:X}", base);
 
         let master_bpm_val: Value<f32> = Value::new(h, base, offsets.master_bpm);
-        //println!("{}", master_bpm_val.read());
 
         let bar1_val: Value<i32> = Value::new(
             h,
@@ -104,10 +96,7 @@ impl Rekordbox {
             Offset::new(vec![offsets.beat_baseoffset, offsets.deck2], offsets.beat),
         );
 
-        // println!("{}.{}   {}.{}", bar1_val.read(), beat1_val.read(), bar2_val.read(), beat2_val.read());
-
         let masterdeck_index_val: Value<u8> = Value::new(h, base, offsets.masterdeck_index);
-        //println!("{}", masterdeck_index.read());
 
         Self {
             master_bpm_val,
@@ -147,6 +136,7 @@ pub struct BeatKeeper {
     pub last_masterindex: u8,
     pub offset_micros: f32,
     pub last_bpm: f32,
+    pub new_beat: bool
 }
 
 impl BeatKeeper {
@@ -158,6 +148,7 @@ impl BeatKeeper {
             last_masterindex: 0,
             offset_micros: 0.,
             last_bpm: 0.,
+            new_beat: false
         }
     }
 
@@ -169,6 +160,7 @@ impl BeatKeeper {
             last_masterindex: 0,
             offset_micros: 0.,
             last_bpm: 0.,
+            new_beat: false,
         }
     }
 
@@ -186,6 +178,7 @@ impl BeatKeeper {
             if (rb.master_beats - self.last_beat).abs() > 0 {
                 self.last_beat = rb.master_beats;
                 self.beat_fraction = 0.;
+                self.new_beat = true;
             }
             self.beat_fraction =
                 (self.beat_fraction + delta.as_micros() as f32 * beats_per_micro) % 1.;
@@ -215,6 +208,14 @@ impl BeatKeeper {
         None
     }
 
+    pub fn get_new_beat(&mut self) -> bool{
+        if self.new_beat{
+            self.new_beat = false;
+            return true;
+        }
+        false
+    }
+
     pub fn change_beat_offset(&mut self, offset: f32) {
         self.offset_micros += offset;
     }
@@ -233,6 +234,7 @@ fn main() {
     let mut source_address = "0.0.0.0:0".to_string();
     let mut target_address = "127.0.0.1:6669".to_string();
     let mut version = RekordboxOffsets::default_version().to_string();
+    let mut osc_enabled = false;
 
     let versions = RekordboxOffsets::get_available_versions();
 
@@ -244,6 +246,9 @@ fn main() {
             if char == '-' {
                 if let Some(flag) = chars.next() {
                     match flag.to_string().as_str() {
+                        "o" => {
+                            osc_enabled = true;
+                        }
                         "s" => {
                             source_address = args_iter.next().unwrap().to_string();
                         }
@@ -260,6 +265,7 @@ A tool for sending Rekordbox timing data to visualizers using OSC
 
 Flags:
 
+ -o  Enable OSC
  -s  Source address, eg. 127.0.0.1:1337
  -t  Target address, eg. 192.168.1.56:6667
  -v  Rekordbox version to target, eg. 6.7.3
@@ -295,34 +301,46 @@ Available versions:",
     };
     println!("Targeting Rekordbox version {version}");
 
-    println!("Connecting from: {}", source_address);
-    println!("Connecting to:   {}", target_address);
+    let socket = if osc_enabled{
+        println!("Connecting from: {}", source_address);
+        println!("Connecting to:   {}", target_address);
+        let socket = match UdpSocket::bind(&source_address) {
+            Ok(socket) => socket,
+            Err(e) => {
+                println!("Failed to bind to address {source_address}. Error:\n{}", e);
+                return;
+            }
+        };
+        match socket.connect(&target_address) {
+            Ok(_) => (),
+            Err(e) => {
+                println!(
+                    "Failed to open socket to address {target_address}. Error:\n{}",
+                    e
+                    );
+                return;
+            }
+        };
+        Some(socket)
+    }else{
+        None
+    };
 
     println!();
     println!(
         "Press i/k to change offset in milliseconds. c to quit. -h flag for help and version info."
-    );
+        );
     println!();
 
-    let socket = match UdpSocket::bind(&source_address) {
-        Ok(socket) => socket,
-        Err(e) => {
-            println!("Failed to bind to address {source_address}. Error:\n{}", e);
-            return;
-        }
-    };
-    match socket.connect(&target_address) {
-        Ok(_) => (),
-        Err(e) => {
-            println!(
-                "Failed to open socket to address {target_address}. Error:\n{}",
-                e
-            );
-            return;
-        }
-    }
+
 
     let mut keeper = BeatKeeper::new(offsets.clone());
+    let link = AblLink::new(120.);
+    link.enable(false);
+
+    let mut state = SessionState::new();
+    link.capture_app_session_state(&mut state);
+    link.enable(true);
 
     // Due to Windows timers having a default resolution 0f 15.6ms, we need to use a "too high"
     // value to acheive ~60Hz
@@ -342,22 +360,32 @@ Available versions:",
 
         keeper.update(delta);
 
-        let bfrac = keeper.get_beat_faction();
+        if let Some(socket) = &socket{
 
-        let msg = OscPacket::Message(OscMessage {
-            addr: "/beat".to_string(),
-            args: vec![OscType::Float(bfrac)],
-        });
-        let packet = encode(&msg).unwrap();
-        socket.send(&packet[..]).unwrap();
+            let bfrac = keeper.get_beat_faction();
 
-        if let Some(bpm) = keeper.get_bpm_changed() {
             let msg = OscPacket::Message(OscMessage {
-                addr: "/bpm".to_string(),
-                args: vec![OscType::Float(bpm)],
+                addr: "/beat".to_string(),
+                args: vec![OscType::Float(bfrac)],
             });
             let packet = encode(&msg).unwrap();
             socket.send(&packet[..]).unwrap();
+
+            if let Some(bpm) = keeper.get_bpm_changed() {
+                state.set_tempo(bpm.into(), link.clock_micros());
+                link.commit_app_session_state(&state);
+                let msg = OscPacket::Message(OscMessage {
+                    addr: "/bpm".to_string(),
+                    args: vec![OscType::Float(bpm)],
+                });
+                let packet = encode(&msg).unwrap();
+                socket.send(&packet[..]).unwrap();
+            }
+        }
+
+        if keeper.get_new_beat(){
+            state.request_beat_at_time(state.beat_at_time(link.clock_micros(), 4.).ceil(), link.clock_micros(), 4.);
+            link.commit_app_session_state(&state);
         }
 
         while let Ok(key) = rx.try_recv() {
@@ -382,21 +410,22 @@ Available versions:",
             let frac = (keeper.last_beat - 1) % 4;
 
             print!(
-                "\rRunning {} [{}] Deck {}     Offset: {}ms     Frq: {}Hz    ",
+                "\rRunning {} [{}] Deck {}     Offset: {}ms     Frq: {}Hz    Peers:{}    ",
                 CHARS[step],
                 (0..4)
-                    .map(|i| {
-                        if i <= frac {
-                            "."
-                        } else {
-                            " "
-                        }
-                    })
-                    .collect::<String>(),
+                .map(|i| {
+                    if i <= frac {
+                        "."
+                    } else {
+                        " "
+                    }
+                })
+                .collect::<String>(),
                 keeper.last_masterindex,
                 keeper.offset_micros / 1000.,
                 1000000 / (delta.as_micros().max(1)),
-            );
+                link.num_peers()
+                );
 
             stdout.flush().unwrap();
         }

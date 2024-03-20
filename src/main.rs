@@ -1,4 +1,5 @@
 use rosc::{encoder::encode, OscMessage, OscPacket, OscType};
+use rusty_link::{AblLink, SessionState};
 use std::{
     env,
     io::{stdout, Write},
@@ -8,7 +9,6 @@ use std::{
     thread::{sleep, spawn},
     time::{Duration, Instant},
 };
-use rusty_link::{AblLink, SessionState};
 use toy_arms::external::{read, Process};
 use winapi::um::winnt::HANDLE;
 
@@ -133,10 +133,10 @@ pub struct BeatKeeper {
     rb: Option<Rekordbox>,
     last_beat: i32,
     pub beat_fraction: f32,
-    pub last_masterindex: u8,
+    pub last_masterdeck_index: u8,
     pub offset_micros: f32,
     pub last_bpm: f32,
-    pub new_beat: bool
+    pub new_beat: bool,
 }
 
 impl BeatKeeper {
@@ -145,10 +145,10 @@ impl BeatKeeper {
             rb: Some(Rekordbox::new(offsets)),
             last_beat: 0,
             beat_fraction: 1.,
-            last_masterindex: 0,
+            last_masterdeck_index: 0,
             offset_micros: 0.,
             last_bpm: 0.,
-            new_beat: false
+            new_beat: false,
         }
     }
 
@@ -157,7 +157,7 @@ impl BeatKeeper {
             rb: None,
             last_beat: 0,
             beat_fraction: 1.,
-            last_masterindex: 0,
+            last_masterdeck_index: 0,
             offset_micros: 0.,
             last_bpm: 0.,
             new_beat: false,
@@ -168,10 +168,10 @@ impl BeatKeeper {
         if let Some(rb) = &mut self.rb {
             let beats_per_micro = rb.master_bpm / 60. / 1000000.;
 
-            rb.update();
+            rb.update(); // Fetch values from rkbx memory
 
-            if rb.masterdeck_index != self.last_masterindex {
-                self.last_masterindex = rb.masterdeck_index;
+            if rb.masterdeck_index != self.last_masterdeck_index {
+                self.last_masterdeck_index = rb.masterdeck_index;
                 self.last_beat = rb.master_beats;
             }
 
@@ -208,8 +208,8 @@ impl BeatKeeper {
         None
     }
 
-    pub fn get_new_beat(&mut self) -> bool{
-        if self.new_beat{
+    pub fn get_new_beat(&mut self) -> bool {
+        if self.new_beat {
             self.new_beat = false;
             return true;
         }
@@ -236,7 +236,7 @@ fn main() {
     let mut version = RekordboxOffsets::default_version().to_string();
     let mut osc_enabled = false;
 
-    let versions = RekordboxOffsets::get_available_versions();
+    let versions = RekordboxOffsets::from_file("offsets");
 
     let mut args_iter = args.iter();
     args_iter.next();
@@ -277,9 +277,14 @@ Current default version: {}
 Available versions:",
                                 RekordboxOffsets::default_version()
                             );
-                            for v in versions.keys() {
+                            let mut versions: Vec<String> =
+                                versions.keys().map(|x| x.to_string()).collect();
+                            versions.sort();
+                            println!("{}", versions.join(", "));
+
+                            /*for v in  {
                                 print!("{v}, ");
-                            }
+                            }*/
                             println!();
                             return;
                         }
@@ -301,7 +306,7 @@ Available versions:",
     };
     println!("Targeting Rekordbox version {version}");
 
-    let socket = if osc_enabled{
+    let socket = if osc_enabled {
         println!("Connecting from: {}", source_address);
         println!("Connecting to:   {}", target_address);
         let socket = match UdpSocket::bind(&source_address) {
@@ -317,22 +322,20 @@ Available versions:",
                 println!(
                     "Failed to open socket to address {target_address}. Error:\n{}",
                     e
-                    );
+                );
                 return;
             }
         };
         Some(socket)
-    }else{
+    } else {
         None
     };
 
     println!();
     println!(
         "Press i/k to change offset in milliseconds. c to quit. -h flag for help and version info."
-        );
+    );
     println!();
-
-
 
     let mut keeper = BeatKeeper::new(offsets.clone());
     let link = AblLink::new(120.);
@@ -355,25 +358,27 @@ Available versions:",
 
     println!("Entering loop");
     loop {
-        let delta = Instant::now() - last_instant;
+        let delta = Instant::now() - last_instant; // Is this timer accurate enough?
         last_instant = Instant::now();
 
-        keeper.update(delta);
+        keeper.update(delta); // Get values, advance time
 
-        if let Some(socket) = &socket{
+        let bfrac = keeper.get_beat_faction();
 
-            let bfrac = keeper.get_beat_faction();
-
+        if let Some(socket) = &socket {
             let msg = OscPacket::Message(OscMessage {
                 addr: "/beat".to_string(),
                 args: vec![OscType::Float(bfrac)],
             });
             let packet = encode(&msg).unwrap();
             socket.send(&packet[..]).unwrap();
+        }
 
-            if let Some(bpm) = keeper.get_bpm_changed() {
-                state.set_tempo(bpm.into(), link.clock_micros());
-                link.commit_app_session_state(&state);
+        if let Some(bpm) = keeper.get_bpm_changed() {
+            state.set_tempo(bpm.into(), link.clock_micros());
+            link.commit_app_session_state(&state);
+
+            if let Some(socket) = &socket {
                 let msg = OscPacket::Message(OscMessage {
                     addr: "/bpm".to_string(),
                     args: vec![OscType::Float(bpm)],
@@ -383,8 +388,15 @@ Available versions:",
             }
         }
 
-        if keeper.get_new_beat(){
-            state.request_beat_at_time(state.beat_at_time(link.clock_micros(), 4.).ceil(), link.clock_micros(), 4.);
+        if keeper.get_new_beat() {
+            //let current_link_beat_approx = state.beat_at_time(link.clock_micros(), 4.).round();
+            //let target_beat = ((keeper.last_beat as f64)%4. - current_link_beat_approx%4. + 4.) % 4. + current_link_beat_approx;
+
+            state.request_beat_at_time(
+                state.beat_at_time(link.clock_micros(), 4.).round(),
+                link.clock_micros(),
+                4.,
+                );
             link.commit_app_session_state(&state);
         }
 
@@ -414,14 +426,14 @@ Available versions:",
                 CHARS[step],
                 (0..4)
                 .map(|i| {
-                    if i <= frac {
+                    if i == frac {
                         "."
                     } else {
                         " "
                     }
                 })
                 .collect::<String>(),
-                keeper.last_masterindex,
+                keeper.last_masterdeck_index,
                 keeper.offset_micros / 1000.,
                 1000000 / (delta.as_micros().max(1)),
                 link.num_peers()

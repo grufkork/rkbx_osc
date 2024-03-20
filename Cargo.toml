@@ -1,6 +1,6 @@
 [package]
 name = "rkbx_osc"
-version = "0.2.0"
+version = "0.2.4"
 edition = "2021"
 authors = ["grufkork"]
 repository = "https://github.com/MichelDEVde/rkbx_osc.git"

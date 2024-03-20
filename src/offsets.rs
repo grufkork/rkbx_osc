@@ -1,10 +1,6 @@
 use std::{collections::HashMap, fs::File, io::Read};
 
 impl RekordboxOffsets {
-    pub fn default_version() -> &'static str {
-        "6.8.3"
-    }
-
     pub fn from_string(input: &str) -> RekordboxOffsets {
         let mut rows = input.split("\r\n");
         RekordboxOffsets {

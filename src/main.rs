@@ -11,6 +11,7 @@ use std::{
 };
 use toy_arms::external::{read, Process};
 use winapi::um::winnt::HANDLE;
+use std::process::Command;
 
 mod offsets;
 use offsets::{Offset, RekordboxOffsets};
@@ -233,10 +234,14 @@ fn main() {
 
     let mut source_address = "0.0.0.0:0".to_string();
     let mut target_address = "127.0.0.1:6669".to_string();
-    let mut version = RekordboxOffsets::default_version().to_string();
+
     let mut osc_enabled = false;
 
-    let versions = RekordboxOffsets::from_file("offsets");
+    let version_offsets = RekordboxOffsets::from_file("offsets");
+    let mut versions: Vec<String> = version_offsets.keys().map(|x| x.to_string()).collect();
+    versions.sort();
+    versions.reverse();
+    let mut target_version = versions[0].clone();
 
     let mut args_iter = args.iter();
     args_iter.next();
@@ -246,6 +251,18 @@ fn main() {
             if char == '-' {
                 if let Some(flag) = chars.next() {
                     match flag.to_string().as_str() {
+                        "u" => {
+                            println!("Updating offsets...");
+                            match Command::new("curl").args(["-o", "offsets", "https://raw.githubusercontent.com/grufkork/rkbx_osc/remoteoffsets/offsets"]).output() {
+                                Ok(output) => {
+                                    println!("{}", String::from_utf8(output.stdout).unwrap());
+                                    println!("{}", String::from_utf8(output.stderr).unwrap());
+                                }
+                                Err(error) => println!("{}", error),
+                            }
+                            println!("Done!");
+                            return;
+                        }
                         "o" => {
                             osc_enabled = true;
                         }
@@ -256,30 +273,30 @@ fn main() {
                             target_address = args_iter.next().unwrap().to_string();
                         }
                         "v" => {
-                            version = args_iter.next().unwrap().to_string();
+                            target_version = args_iter.next().unwrap().to_string();
                         }
                         "h" => {
                             println!(
-                                " - Rekordbox OSC v0.1.0 -
+                                " - Rekordbox OSC v0.3.0 -
 A tool for sending Rekordbox timing data to visualizers using OSC
 
 Flags:
 
+ -h  Print this help
+ -u  Fetch latest offset list from GitHub and exit
+ -v  Rekordbox version to target, eg. 6.7.3
+
+-- OSC --
  -o  Enable OSC
  -s  Source address, eg. 127.0.0.1:1337
  -t  Target address, eg. 192.168.1.56:6667
- -v  Rekordbox version to target, eg. 6.7.3
- -h  Print this help
 
 Use i/k to change the beat offset by +/- 1ms
 
 Current default version: {}
 Available versions:",
-                                RekordboxOffsets::default_version()
+                                versions[0]
                             );
-                            let mut versions: Vec<String> =
-                                versions.keys().map(|x| x.to_string()).collect();
-                            versions.sort();
                             println!("{}", versions.join(", "));
 
                             /*for v in  {
@@ -298,13 +315,13 @@ Available versions:",
         }
     }
 
-    let offsets = if let Some(offsets) = versions.get(version.as_str()) {
+    let offsets = if let Some(offsets) = version_offsets.get(target_version.as_str()) {
         offsets
     } else {
-        println!("Unsupported version! {version}");
+        println!("Unsupported version! {target_version}");
         return;
     };
-    println!("Targeting Rekordbox version {version}");
+    println!("Targeting Rekordbox version {target_version}");
 
     let socket = if osc_enabled {
         println!("Connecting from: {}", source_address);
@@ -389,11 +406,11 @@ Available versions:",
         }
 
         if keeper.get_new_beat() {
-            //let current_link_beat_approx = state.beat_at_time(link.clock_micros(), 4.).round();
-            //let target_beat = ((keeper.last_beat as f64)%4. - current_link_beat_approx%4. + 4.) % 4. + current_link_beat_approx;
+            let current_link_beat_approx = state.beat_at_time(link.clock_micros(), 4.).round();
+            let target_beat = ((keeper.last_beat as f64)%4. - current_link_beat_approx%4. + 4.) % 4. + current_link_beat_approx - 1.; // Ensure the 1 is on the 1
 
             state.request_beat_at_time(
-                state.beat_at_time(link.clock_micros(), 4.).round(),
+                target_beat,
                 link.clock_micros(),
                 4.,
                 );
@@ -416,13 +433,13 @@ Available versions:",
             }
         }
 
-        if count % 10 == 0 {
+        if count % 20 == 0 {
             step = (step + 1) % 4;
 
             let frac = (keeper.last_beat - 1) % 4;
 
             print!(
-                "\rRunning {} [{}] Deck {}     Offset: {}ms     Frq: {}Hz    Peers:{}    ",
+                "\rRunning {} [{}] Deck {}     OSC Offset: {}ms     Frq: {: >3}Hz    Peers:{}    ",
                 CHARS[step],
                 (0..4)
                 .map(|i| {

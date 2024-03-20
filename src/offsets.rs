@@ -2,7 +2,7 @@ use std::{collections::HashMap, fs::File, io::Read};
 
 impl RekordboxOffsets {
     pub fn default_version() -> &'static str {
-        "6.8.2"
+        "6.8.3"
     }
 
     pub fn from_string(input: &str) -> RekordboxOffsets{
@@ -26,6 +26,45 @@ impl RekordboxOffsets {
         
             
         /*map.insert(
+            "6.8.3",
+            RekordboxOffsets {
+                beat_baseoffset: 0x0443F650,
+                deck1: 0x120,
+                deck2: 0x128,
+                bar: 0x1e18,
+                beat: 0x1e1c,
+                master_bpm: Offset::new(vec![0x04440260, 0x48, 0xF8, 0x28], 0xB98),
+                masterdeck_index: Offset::new(vec![0x043DBDD0, 0x20, 0x278], 0xE20),
+            }
+        );
+
+        map.insert(
+            "6.8.2",
+            RekordboxOffsets {
+                beat_baseoffset: 0x043FB790,
+                deck1: 0x120,
+                deck2: 0x128,
+                bar: 0x1e18,
+                beat: 0x1e1c,
+                master_bpm: Offset::new(vec![0x043FC3A0, 0x18, 0xF8, 0x0], 0x128),
+                masterdeck_index: Offset::new(vec![0x04399C88, 0x20, 0x278], 0xe18),
+            },
+        );
+
+        map.insert(
+            "6.7.7",
+            RekordboxOffsets {
+                beat_baseoffset: 0x043BB250,
+                deck1: 0x120,
+                deck2: 0x128,
+                bar: 0x1e18,
+                beat: 0x1e1c,
+                master_bpm: Offset::new(vec![0x043BBE60, 0x28, 0x208, 0x1d8], 0x140),
+                masterdeck_index: Offset::new(vec![0x043BB250, 0x18, 0x720], 0x1058),
+            },
+        );
+
+        map.insert(
             "6.7.4",
             RekordboxOffsets {
                 beat_baseoffset: 0x04392560,

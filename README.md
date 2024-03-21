@@ -6,9 +6,6 @@ When run on the same computer as an instance of Rekordbox, it will read the curr
 
 The program does not interact with the audio stream in any way, but reads the onscreen text values through memory. Thus your beatgrid must be correct for it to work as expected. 
 
-When run on the same computer as a Rekordbox instance, it will send the current beat fraction on OSC address `/beat` to the specified target IP. This can be received by, for instance, a visualiser and drive an animation. The value is a float, set to zero on the beat and increasing to 1 just before the next beat. It should send updates at approximately 60Hz. 
-
-
 ## Why?
 Rekordbox's Ableton Link integration only allows for receiving a signal, not extracting it.
 
@@ -37,7 +34,7 @@ When a change occurs, the beat fraction is set to 0 and then counts linearly upw
 
 ## Limitations
 - Only supports two decks.
-- Might register extra beats when switching master deck
+- Might register an extra beat when switching master deck.
 - Assumes 4/4 time signature - Rekordbox does not support anything else without manually editing the database
 - Windows only
 

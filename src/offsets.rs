@@ -1,84 +1,63 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, fs::File, io::Read};
 
 impl RekordboxOffsets {
-    pub fn default_version() -> &'static str {
-        "6.8.3"
+    pub fn from_lines(lines: &[String]) -> RekordboxOffsets {
+        let mut rows = lines.iter();
+        RekordboxOffsets {
+            rbversion: rows.next().unwrap().to_string(),
+            beat_baseoffset: hexparse(rows.next().unwrap()),
+            deck1: hexparse(rows.next().unwrap()),
+            deck2: hexparse(rows.next().unwrap()),
+            bar: hexparse(rows.next().unwrap()),
+            beat: hexparse(rows.next().unwrap()),
+            master_bpm: Offset::new(
+                rows.next()
+                    .unwrap()
+                    .split(' ')
+                    .map(hexparse)
+                    .collect::<Vec<usize>>(),
+                hexparse(rows.next().unwrap()),
+            ),
+            masterdeck_index: Offset::new(
+                rows.next()
+                    .unwrap()
+                    .split(' ')
+                    .map(hexparse)
+                    .collect::<Vec<usize>>(),
+                hexparse(rows.next().unwrap()),
+            ),
+        }
     }
 
-    pub fn get_available_versions() -> HashMap<&'static str, RekordboxOffsets> {
+    pub fn from_file(name: &str) -> HashMap<String, RekordboxOffsets> {
+        let mut file = File::open(name).unwrap();
+        let mut contents = String::new();
+        file.read_to_string(&mut contents).unwrap();
+        drop(file);
+
         let mut map = HashMap::new();
 
-        map.insert(
-            "6.8.3",
-            RekordboxOffsets {
-                beat_baseoffset: 0x0443F650,
-                deck1: 0x120,
-                deck2: 0x128,
-                bar: 0x1e18,
-                beat: 0x1e1c,
-                master_bpm: Offset::new(vec![0x04440260, 0x48, 0xF8, 0x28], 0xB98),
-                masterdeck_index: Offset::new(vec![0x043DBDD0, 0x20, 0x278], 0xE20),
+
+        let mut lines = vec![];
+        for line in contents.lines(){
+            if line.is_empty(){
+                let o = RekordboxOffsets::from_lines(&lines);
+                map.insert(o.rbversion.clone(), o);
+                lines.clear();
+            }else{
+                lines.push(line.to_string());
             }
-        );
+        }
 
-        map.insert(
-            "6.8.2",
-            RekordboxOffsets {
-                beat_baseoffset: 0x043FB790,
-                deck1: 0x120,
-                deck2: 0x128,
-                bar: 0x1e18,
-                beat: 0x1e1c,
-                master_bpm: Offset::new(vec![0x043FC3A0, 0x18, 0xF8, 0x0], 0x128),
-                masterdeck_index: Offset::new(vec![0x04399C88, 0x20, 0x278], 0xe18),
-            },
-        );
-
-        map.insert(
-            "6.7.7",
-            RekordboxOffsets {
-                beat_baseoffset: 0x043BB250,
-                deck1: 0x120,
-                deck2: 0x128,
-                bar: 0x1e18,
-                beat: 0x1e1c,
-                master_bpm: Offset::new(vec![0x043BBE60, 0x28, 0x208, 0x1d8], 0x140),
-                masterdeck_index: Offset::new(vec![0x043BB250, 0x18, 0x720], 0x1058),
-            },
-        );
-
-        map.insert(
-            "6.7.4",
-            RekordboxOffsets {
-                beat_baseoffset: 0x04392560,
-                deck1: 0x120,
-                deck2: 0x128,
-                bar: 0x1e18,
-                beat: 0x1e1c,
-                master_bpm: Offset::new(vec![0x0434c088, 0xe8, 0x1c0, 0x0], 0xb48),
-                masterdeck_index: Offset::new(vec![0x04393430, 0x0, 0x58, 0x0, 0x530, 0x80], 0x144),
-            },
-        );
-
-        map.insert(
-            "6.7.3",
-            RekordboxOffsets {
-                beat_baseoffset: 0x043498e0,
-                deck1: 0x118,
-                deck2: 0x120,
-                bar: 0x1e18,
-                beat: 0x1e1c,
-                master_bpm: Offset::new(vec![0x0434A4F0, 0x18, 0x110, 0x0, 0x70], 0x158),
-                masterdeck_index: Offset::new(vec![0x043498e0, 0x90], 0x19c),
-            },
-        );
-
+        // for version in contents.split("\n\n") {
+        // }
         map
     }
 }
 
 #[derive(Clone)]
 pub struct RekordboxOffsets {
+    pub rbversion: String,
     pub beat_baseoffset: usize,
     pub deck1: usize,
     pub deck2: usize,
@@ -101,4 +80,8 @@ impl Offset {
             final_offset,
         }
     }
+}
+
+fn hexparse(input: &str) -> usize {
+    usize::from_str_radix(input, 16).unwrap()
 }

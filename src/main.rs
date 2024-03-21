@@ -1,13 +1,7 @@
 use rosc::{encoder::encode, OscMessage, OscPacket, OscType};
 use rusty_link::{AblLink, SessionState};
 use std::{
-    env,
-    io::{stdout, Write},
-    marker::PhantomData,
-    net::UdpSocket,
-    sync::mpsc::channel,
-    thread::{sleep, spawn},
-    time::{Duration, Instant},
+    env, io::{stdout, Write}, marker::PhantomData, net::UdpSocket, path::Path, sync::mpsc::channel, thread::{sleep, spawn}, time::{Duration, Instant}
 };
 use toy_arms::external::{read, Process};
 use winapi::um::winnt::HANDLE;
@@ -69,7 +63,7 @@ pub struct Rekordbox {
 
 impl Rekordbox {
     fn new(offsets: RekordboxOffsets) -> Self {
-        let rb = Process::from_process_name("rekordbox.exe").unwrap();
+        let rb = Process::from_process_name("rekordbox.exe").expect("Could not find Rekordbox process! ");
         let h = rb.process_handle;
 
         let base = rb.get_module_base("rekordbox.exe").unwrap();
@@ -225,6 +219,12 @@ impl BeatKeeper {
 const CHARS: [&str; 4] = ["|", "/", "-", "\\"];
 
 fn main() {
+    if !Path::new("./offsets").exists() {
+        println!("Offsets not found, downloading from repo...");
+        download_offsets();
+    }
+
+
     let (tx, rx) = channel::<i8>();
     spawn(move || loop {
         tx.send(getch()).unwrap();
@@ -253,14 +253,7 @@ fn main() {
                     match flag.to_string().as_str() {
                         "u" => {
                             println!("Updating offsets...");
-                            match Command::new("curl").args(["-o", "offsets", "https://raw.githubusercontent.com/grufkork/rkbx_osc/master/offsets"]).output() {
-                                Ok(output) => {
-                                    println!("{}", String::from_utf8(output.stdout).unwrap());
-                                    println!("{}", String::from_utf8(output.stderr).unwrap());
-                                }
-                                Err(error) => println!("{}", error),
-                            }
-                            println!("Done!");
+                            download_offsets();
                             return;
                         }
                         "o" => {
@@ -462,4 +455,15 @@ Available versions:",
 
         sleep(period);
     }
+}
+
+fn download_offsets(){
+    match Command::new("curl").args(["-o", "offsets", "https://raw.githubusercontent.com/grufkork/rkbx_osc/master/offsets"]).output() {
+        Ok(output) => {
+            println!("{}", String::from_utf8(output.stdout).unwrap());
+            println!("{}", String::from_utf8(output.stderr).unwrap());
+        }
+        Err(error) => println!("{}", error),
+    }
+    println!("Done!");
 }

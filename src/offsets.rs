@@ -1,7 +1,7 @@
 use std::{collections::HashMap, fs::File, io::Read};
 
 impl RekordboxOffsets {
-    pub fn from_lines(lines: &Vec<String>) -> RekordboxOffsets {
+    pub fn from_lines(lines: &[String]) -> RekordboxOffsets {
         let mut rows = lines.iter();
         RekordboxOffsets {
             rbversion: rows.next().unwrap().to_string(),

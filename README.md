@@ -43,6 +43,7 @@ Any version not listed will 99% not work, but you can always try using an adjace
 
 | Rekordbox Version  | Verified? |
 | ----- | --- |
+| 6.8.4 | ✔️ |
 | 6.8.3 | ✔️ |
 | 6.8.2 | ✔️ |
 | 6.7.7 | ✔️ |

@@ -1,3 +1,28 @@
+#      EXAMPLE ENTRY
+#
+# 6.8.3               version number
+# 0443F650            beat_baseoffset
+# 120                 deck1
+# 128                 deck2
+# 1e18                bar
+# 1e1c                beat
+# 04440260 48 F8 28   master_bpm offsets
+# B98                 master_bpm final offset
+# 043DBDD0 20 278     masterdeck_index offsets
+# E20                 masterdeck_index final offset
+
+
+6.8.4
+0443F5D0
+120
+128
+1e18
+1e1c
+044401E0 28 F8 0
+128
+0443F5D0 270
+19C
+
 6.8.3
 0443F650
 120

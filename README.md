@@ -1,29 +1,35 @@
 # Rekordbox OSC
-A tiny tool for sending Rekordbox timing information to visualizers etc. over OSC. 
-Currently an MVP, with future functions including sending more information and better UX.
+Connecting Rekordbox to visualizers and music software over Ableton Link and OSC
 
 ## What does it do?
-When run on the same computer as a Rekordbox instance, it will send the current beat fraction on OSC address `/beat` to the specified target IP. This can be received by, for instance, a visualiser and drive an animation. The value is a float, set to zero on the beat and increasing to 1 just before the next beat. It should send updates at approximately 60Hz. 
+When run on the same computer as an instance of Rekordbox, it will read the current timing information and send this over your protocol of choice. By default it outputs a 4-beat aligned signal using Ableton Link, but it can also transmit equivalent data over OSC, although with less accurate timing. 
 
 The program does not interact with the audio stream in any way, but reads the onscreen text values through memory. Thus your beatgrid must be correct for it to work as expected. 
 
+When run on the same computer as a Rekordbox instance, it will send the current beat fraction on OSC address `/beat` to the specified target IP. This can be received by, for instance, a visualiser and drive an animation. The value is a float, set to zero on the beat and increasing to 1 just before the next beat. It should send updates at approximately 60Hz. 
+
+
 ## Why?
-Rekordbox's Ableton Link integration leaves some to be desired.
+Rekordbox's Ableton Link integration only allows for receiving a signal, not extracting it.
 
 ## Usage
 `rkbx_osc.exe [flags]`
 where
-```
+``` 
+ -h  Print help and available versions
+ -u  Fetch latest offset list from GitHub and exit
+ -v  Rekordbox version to target, eg. 6.7.3
+
+-- OSC --
+ -o  Enable OSC
  -s  Source address, eg. 127.0.0.1:1337
  -t  Target address, eg. 192.168.1.56:6667
- -v  Rekordbox version to target, eg. 6.7.3
- -h  Print help and available versions
 ```
-If no arguments are given, it defaults to the latest supported rekordbox version and sending to 127.0.0.1:6669. As messages are sent with UDP, source address should not need to be set.
+If no arguments are given, it defaults to the latest supported rekordbox version and Ableton Link. If OSC is enabled, it will send to 127.0.0.1:6669. As messages are sent with UDP, source address should not need to be set.
 
-The program will then send:
- - the current beat fraction, as a float counting from 0 to 1, to the OSC address `/beat`
- - the master deck tempo in BPM on OSC address `/bpm`
+## OSC Addresses
+ - `/beat`: the current beat fraction, as a float counting from 0 to 1
+ - `/bpm`: the master deck tempo in BPM
 
 ## How it works
 The timing information is extracted through reading Rekordbox's memory. The program reads the current beat and measure from the text display on top of the large waveform, and detects when these change.
@@ -32,7 +38,7 @@ When a change occurs, the beat fraction is set to 0 and then counts linearly upw
 ## Limitations
 - Only supports two decks.
 - Might register extra beats when switching master deck
-- Assumes 4/4 time signature. (Does Rekordbox support anything else? 3/4 and lower shoud work OK, 5/4 and higher might behave strangely)
+- Assumes 4/4 time signature - Rekordbox does not support anything else without manually editing the database
 - Windows only
 
 ## Supported versions
@@ -47,13 +53,31 @@ Any version not listed will 99% not work, but you can always try using an adjace
 | 6.7.3 | ✔️ |
 
 # Technical Details
+
+## Offsets file format
+The offsets file contain the hex memory addresses (without the leading 0x) for the values we need to fetch. The file does not support any comments, and must be formatted precisely.
+
+Example entry:
+```
+6.8.3               version number
+0443F650            beat_baseoffset
+120                 deck1
+128                 deck2
+1e18                bar
+1e1c                beat
+04440260 48 F8 28   master_bpm offsets
+B98                 master_bpm final offset
+043DBDD0 20 278     masterdeck_index offsets
+E20                 masterdeck_index final offset
+```
+
 ## Updating
 Every Rekordbox update the memory offsets change. Some have proven to remain the same, but usually the first offsets in the paths require updating. 
 To find these, I use Cheatengine, using pointerscans and trying to find the shortest pointer paths.
 
 Easiest method seems to be to find each value, pointerscan, save that, then reopen rekordbox and filter the pointerscans by value.
 
-Updates are welcome, put them in the `offsets.rs` file.
+Updates are welcome, put them in the `offsets` file.
 
 ### `master_bpm`
 The BPM value of the current master track. Find by loading a track on deck 1 & 2, then search for a float containing the BPM of the deck currently set as Master.

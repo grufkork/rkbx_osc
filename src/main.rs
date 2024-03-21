@@ -253,7 +253,7 @@ fn main() {
                     match flag.to_string().as_str() {
                         "u" => {
                             println!("Updating offsets...");
-                            match Command::new("curl").args(["-o", "offsets", "https://raw.githubusercontent.com/grufkork/rkbx_osc/remoteoffsets/offsets"]).output() {
+                            match Command::new("curl").args(["-o", "offsets", "https://raw.githubusercontent.com/grufkork/rkbx_osc/master/offsets"]).output() {
                                 Ok(output) => {
                                     println!("{}", String::from_utf8(output.stdout).unwrap());
                                     println!("{}", String::from_utf8(output.stderr).unwrap());

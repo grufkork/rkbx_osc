@@ -55,9 +55,9 @@ Any version not listed will 99% not work, but you can always try using an adjace
 # Technical Details
 
 ## Offsets file format
-The offsets file contain the hex memory addresses (without the leading 0x) for the values we need to fetch. The file does not support any comments, and must be formatted precisely.
+The `offsets` file contain the hex memory addresses (without the leading 0x) for the values we need to fetch. The file does not support any comments, and must be formatted precisely.
 
-Example entry:
+Example entry with explanations:
 ```
 6.8.3               version number
 0443F650            beat_baseoffset
@@ -71,9 +71,11 @@ B98                 master_bpm final offset
 E20                 masterdeck_index final offset
 ```
 
+"Offsets" and "final offset" refers to the chain of offsets found in eg. Cheat Engine, where the final offset is the value added to the address found at the end of the chain. 
+
 ## Updating
-Every Rekordbox update the memory offsets change. Some have proven to remain the same, but usually the first offsets in the paths require updating. 
-To find these, I use Cheatengine, using pointerscans and trying to find the shortest pointer paths.
+Every Rekordbox update the memory offsets change. Some (deck1, bar and beat mostly) have proven to remain the same, but usually the first offsets in the paths require updating. 
+To find these, I use Cheat Engine, using pointerscans and trying to find the shortest pointer paths.
 
 Easiest method seems to be to find each value, pointerscan, save that, then reopen rekordbox and filter the pointerscans by value.
 
@@ -94,4 +96,4 @@ The first value in the path to any of the measure/beat displays at the top of th
 Appear to remain the same. These are offsets added to `beat_baseoffset` to find the specific values.
 
 ## Notes on timing
-Windows, by default, only has sleeps in increments of ~16ms. As such, the the sending frequency is a bit uneven. The rate is set to 120Hz in the code, but that results in about 60Hz update rate.
+Windows, by default, only has sleeps in increments of ~16ms. As such, the the sending frequency is a bit uneven. The rate is set to 120Hz in the code, but that results in about 60Hz update rate. I'm not sure if the method measuring the delta time is accurate enough, or 

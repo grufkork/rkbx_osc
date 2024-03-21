@@ -40,12 +40,16 @@ impl RekordboxOffsets {
 
         let mut lines = vec![];
         for line in contents.lines(){
-            if line.is_empty(){
-                let o = RekordboxOffsets::from_lines(&lines);
-                map.insert(o.rbversion.clone(), o);
-                lines.clear();
+            if line.is_empty(){ 
+                if !lines.is_empty(){
+                    let o = RekordboxOffsets::from_lines(&lines);
+                    map.insert(o.rbversion.clone(), o);
+                    lines.clear();
+                }
             }else{
-                lines.push(line.to_string());
+                if line.chars().next().unwrap() != '#' {
+                    lines.push(line.to_string());
+                }
             }
         }
 

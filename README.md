@@ -52,7 +52,7 @@ Any version not listed will 99% not work, but you can always try using an adjace
 # Technical Details
 
 ## Offsets file format
-The `offsets` file contain the hex memory addresses (without the leading 0x) for the values we need to fetch. The file does not support any comments, and must be formatted precisely.
+The `offsets` file contain the hex memory addresses (without the leading 0x) for the values we need to fetch. The file supports basic comments (# at start of line). Versions are separated by two newlines.
 
 Example entry with explanations:
 ```

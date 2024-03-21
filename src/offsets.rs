@@ -1,8 +1,8 @@
 use std::{collections::HashMap, fs::File, io::Read};
 
 impl RekordboxOffsets {
-    pub fn from_string(input: &str) -> RekordboxOffsets {
-        let mut rows = input.split("\r\n");
+    pub fn from_lines(lines: &Vec<String>) -> RekordboxOffsets {
+        let mut rows = lines.iter();
         RekordboxOffsets {
             rbversion: rows.next().unwrap().to_string(),
             beat_baseoffset: hexparse(rows.next().unwrap()),
@@ -36,10 +36,21 @@ impl RekordboxOffsets {
         drop(file);
 
         let mut map = HashMap::new();
-        for version in contents.split("\r\n\r\n") {
-            let o = RekordboxOffsets::from_string(version);
-            map.insert(o.rbversion.clone(), o);
+
+
+        let mut lines = vec![];
+        for line in contents.lines(){
+            if line.is_empty(){
+                let o = RekordboxOffsets::from_lines(&lines);
+                map.insert(o.rbversion.clone(), o);
+                lines.clear();
+            }else{
+                lines.push(line.to_string());
+            }
         }
+
+        // for version in contents.split("\n\n") {
+        // }
         map
     }
 }

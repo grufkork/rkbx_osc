@@ -67,7 +67,7 @@ impl Pointer {
     }
 
     pub fn from_string(input: &str) -> Self {
-        let mut split = input.split(' ').map(hexparse).collect::<Vec<usize>>();
+        let split = input.split(' ').map(hexparse).collect::<Vec<usize>>();
         Self::new(split[0..split.len() - 1].to_vec(), *split.last().unwrap())
     }
 }

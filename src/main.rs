@@ -261,7 +261,7 @@ fn main() {
                         }
                         "h" => {
                             println!(
-                                " - Rekordbox OSC v0.3.0 -
+                                " - Rekordbox OSC v{} -
 A tool for sending Rekordbox timing data to visualizers using OSC
 
 Flags:
@@ -279,6 +279,7 @@ Use i/k to change the beat offset by +/- 1ms
 
 Current default version: {}
 Available versions:",
+                                env!("CARGO_PKG_VERSION"),
                                 versions[0]
                             );
                             println!("{}", versions.join(", "));

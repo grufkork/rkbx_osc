@@ -39,7 +39,8 @@ When a change occurs, the beat fraction is set to 0 and then counts linearly upw
 - Windows only
 
 ## Supported versions
-Any version not listed will 99% not work, but you can always try using an adjacent version.
+~~ Any version not listed will 99% not work, but you can always try using an adjacent version. ~~
+As of 7.0.1 the offsets do not seem to change. I hope it continues this way.
 
 | Rekordbox Version  |
 | ----- |
@@ -63,15 +64,15 @@ Example entry with explanations:
 ```
 
 ## Updating
-Every Rekordbox update the memory offsets change.
-To find these, I use Cheat Engine, using pointerscans and trying to find the shortest pointer paths.
+Previously, every Rekordbox update the memory offsets changed. From 7.0.0 -> 7.0.1 the old offsets continued working. 
+When the pointers change, I use Cheat Engine, using pointerscans and trying to find the shortest pointer paths.
 
-Easiest method seems to be to find each value, pointerscan, save that, then reopen rekordbox and filter the pointerscans by value. If you can't find any values, try increasing the maximum offset value to something like 32768.
+Easiest method seems to be to find each value, pointerscan, save that, then reopen rekordbox and filter the pointerscans by value. If you can't find any values, try increasing the maximum offset value to something like 32768, offsets = 16. To save performance you can set max level to 5 or 6, paths should not be longer than that.
 
 Updates are welcome, put them in the `offsets` file.
 
 ### `master_bpm`
-The BPM value of the current master track. Find by loading a track on deck 1 & 2, then search for a float containing the BPM of the deck currently set as Master.
+The BPM value of the current master track. Find by loading a track on deck 1 & 2, then search for a float containing the BPM of the deck currently set as Master. Find a value that matches exactly and make sure it doesn't oscillate when you play on that deck.
 
 ### `masterdeck_index`
 The index of the deck currently set as Master. 0 for deck 1, 1 for deck 2. Not sure if the value I've found is the index of the selected deck, or a boolean dictating if Deck 2 is master. Search for a byte.

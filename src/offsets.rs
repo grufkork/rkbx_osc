@@ -30,10 +30,8 @@ impl RekordboxOffsets {
                     map.insert(o.rbversion.clone(), o);
                     lines.clear();
                 }
-            } else {
-                if line.chars().next().unwrap() != '#' {
-                    lines.push(line.to_string());
-                }
+            } else if !line.starts_with('#') {
+                lines.push(line.to_string());
             }
         }
 

@@ -1,14 +1,21 @@
 use rosc::{encoder::encode, OscMessage, OscPacket, OscType};
 use rusty_link::{AblLink, SessionState};
+use std::process::Command;
 use std::{
-    env, io::{stdout, Write}, marker::PhantomData, net::UdpSocket, path::Path, sync::mpsc::channel, thread::{sleep, spawn}, time::{Duration, Instant}
+    env,
+    io::{stdout, Write},
+    marker::PhantomData,
+    net::UdpSocket,
+    path::Path,
+    sync::mpsc::channel,
+    thread::{sleep, spawn},
+    time::{Duration, Instant},
 };
 use toy_arms::external::{read, Process};
 use winapi::um::winnt::HANDLE;
-use std::process::Command;
 
 mod offsets;
-use offsets::{Offset, RekordboxOffsets};
+use offsets::{Pointer, RekordboxOffsets};
 
 extern "C" {
     fn _getch() -> core::ffi::c_char;
@@ -25,7 +32,7 @@ struct Value<T> {
 }
 
 impl<T> Value<T> {
-    fn new(h: HANDLE, base: usize, offsets: Offset) -> Value<T> {
+    fn new(h: HANDLE, base: usize, offsets: Pointer) -> Value<T> {
         let mut address = base;
 
         for offset in offsets.offsets {
@@ -63,33 +70,18 @@ pub struct Rekordbox {
 
 impl Rekordbox {
     fn new(offsets: RekordboxOffsets) -> Self {
-        let rb = Process::from_process_name("rekordbox.exe").expect("Could not find Rekordbox process! ");
+        let rb = Process::from_process_name("rekordbox.exe")
+            .expect("Could not find Rekordbox process! ");
         let h = rb.process_handle;
 
         let base = rb.get_module_base("rekordbox.exe").unwrap();
 
         let master_bpm_val: Value<f32> = Value::new(h, base, offsets.master_bpm);
 
-        let bar1_val: Value<i32> = Value::new(
-            h,
-            base,
-            Offset::new(vec![offsets.beat_baseoffset, offsets.deck1], offsets.bar),
-        );
-        let beat1_val: Value<i32> = Value::new(
-            h,
-            base,
-            Offset::new(vec![offsets.beat_baseoffset, offsets.deck1], offsets.beat),
-        );
-        let bar2_val: Value<i32> = Value::new(
-            h,
-            base,
-            Offset::new(vec![offsets.beat_baseoffset, offsets.deck2], offsets.bar),
-        );
-        let beat2_val: Value<i32> = Value::new(
-            h,
-            base,
-            Offset::new(vec![offsets.beat_baseoffset, offsets.deck2], offsets.beat),
-        );
+        let bar1_val: Value<i32> = Value::new(h, base, offsets.deck1bar);
+        let beat1_val: Value<i32> = Value::new(h, base, offsets.deck1beat);
+        let bar2_val: Value<i32> = Value::new(h, base, offsets.deck2bar);
+        let beat2_val: Value<i32> = Value::new(h, base, offsets.deck2beat);
 
         let masterdeck_index_val: Value<u8> = Value::new(h, base, offsets.masterdeck_index);
 
@@ -223,7 +215,6 @@ fn main() {
         println!("Offsets not found, downloading from repo...");
         download_offsets();
     }
-
 
     let (tx, rx) = channel::<i8>();
     spawn(move || loop {
@@ -400,13 +391,12 @@ Available versions:",
 
         if keeper.get_new_beat() {
             let current_link_beat_approx = state.beat_at_time(link.clock_micros(), 4.).round();
-            let target_beat = ((keeper.last_beat as f64)%4. - current_link_beat_approx%4. + 4.) % 4. + current_link_beat_approx - 1.; // Ensure the 1 is on the 1
+            let target_beat = ((keeper.last_beat as f64) % 4. - current_link_beat_approx % 4. + 4.)
+                % 4.
+                + current_link_beat_approx
+                - 1.; // Ensure the 1 is on the 1
 
-            state.request_beat_at_time(
-                target_beat,
-                link.clock_micros(),
-                4.,
-                );
+            state.request_beat_at_time(target_beat, link.clock_micros(), 4.);
             link.commit_app_session_state(&state);
         }
 
@@ -432,7 +422,7 @@ Available versions:",
             let frac = (keeper.last_beat - 1) % 4;
 
             print!(
-                "\rRunning {} [{}] Deck {}     OSC Offset: {}ms     Frq: {: >3}Hz    Peers:{}    ",
+                "\rRunning {} [{}] Deck {}     OSC Offset: {}ms     Frq: {: >3}Hz    Peers:{}   BPM:{}    ",
                 CHARS[step],
                 (0..4)
                 .map(|i| {
@@ -446,7 +436,8 @@ Available versions:",
                 keeper.last_masterdeck_index,
                 keeper.offset_micros / 1000.,
                 1000000 / (delta.as_micros().max(1)),
-                link.num_peers()
+                link.num_peers(),
+                keeper.last_bpm
                 );
 
             stdout.flush().unwrap();
@@ -457,8 +448,15 @@ Available versions:",
     }
 }
 
-fn download_offsets(){
-    match Command::new("curl").args(["-o", "offsets", "https://raw.githubusercontent.com/grufkork/rkbx_osc/master/offsets"]).output() {
+fn download_offsets() {
+    match Command::new("curl")
+        .args([
+            "-o",
+            "offsets",
+            "https://raw.githubusercontent.com/grufkork/rkbx_osc/master/offsets",
+        ])
+        .output()
+    {
         Ok(output) => {
             println!("{}", String::from_utf8(output.stdout).unwrap());
             println!("{}", String::from_utf8(output.stderr).unwrap());

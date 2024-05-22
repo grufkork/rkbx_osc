@@ -5,27 +5,12 @@ impl RekordboxOffsets {
         let mut rows = lines.iter();
         RekordboxOffsets {
             rbversion: rows.next().unwrap().to_string(),
-            beat_baseoffset: hexparse(rows.next().unwrap()),
-            deck1: hexparse(rows.next().unwrap()),
-            deck2: hexparse(rows.next().unwrap()),
-            bar: hexparse(rows.next().unwrap()),
-            beat: hexparse(rows.next().unwrap()),
-            master_bpm: Offset::new(
-                rows.next()
-                    .unwrap()
-                    .split(' ')
-                    .map(hexparse)
-                    .collect::<Vec<usize>>(),
-                hexparse(rows.next().unwrap()),
-            ),
-            masterdeck_index: Offset::new(
-                rows.next()
-                    .unwrap()
-                    .split(' ')
-                    .map(hexparse)
-                    .collect::<Vec<usize>>(),
-                hexparse(rows.next().unwrap()),
-            ),
+            deck1bar: Pointer::from_string(rows.next().unwrap()),
+            deck1beat: Pointer::from_string(rows.next().unwrap()),
+            deck2bar: Pointer::from_string(rows.next().unwrap()),
+            deck2beat: Pointer::from_string(rows.next().unwrap()),
+            master_bpm: Pointer::from_string(rows.next().unwrap()),
+            masterdeck_index: Pointer::from_string(rows.next().unwrap()),
         }
     }
 
@@ -37,24 +22,21 @@ impl RekordboxOffsets {
 
         let mut map = HashMap::new();
 
-
         let mut lines = vec![];
-        for line in contents.lines(){
-            if line.is_empty(){ 
-                if !lines.is_empty(){
+        for line in contents.lines() {
+            if line.is_empty() {
+                if !lines.is_empty() {
                     let o = RekordboxOffsets::from_lines(&lines);
                     map.insert(o.rbversion.clone(), o);
                     lines.clear();
                 }
-            }else{
+            } else {
                 if line.chars().next().unwrap() != '#' {
                     lines.push(line.to_string());
                 }
             }
         }
 
-        // for version in contents.split("\n\n") {
-        // }
         map
     }
 }
@@ -62,27 +44,31 @@ impl RekordboxOffsets {
 #[derive(Clone)]
 pub struct RekordboxOffsets {
     pub rbversion: String,
-    pub beat_baseoffset: usize,
-    pub deck1: usize,
-    pub deck2: usize,
-    pub bar: usize,
-    pub beat: usize,
-    pub master_bpm: Offset,
-    pub masterdeck_index: Offset,
+    pub deck1bar: Pointer,
+    pub deck1beat: Pointer,
+    pub deck2bar: Pointer,
+    pub deck2beat: Pointer,
+    pub master_bpm: Pointer,
+    pub masterdeck_index: Pointer,
 }
 
 #[derive(Clone)]
-pub struct Offset {
+pub struct Pointer {
     pub offsets: Vec<usize>,
     pub final_offset: usize,
 }
 
-impl Offset {
-    pub fn new(offests: Vec<usize>, final_offset: usize) -> Offset {
-        Offset {
+impl Pointer {
+    pub fn new(offests: Vec<usize>, final_offset: usize) -> Pointer {
+        Pointer {
             offsets: offests,
             final_offset,
         }
+    }
+
+    pub fn from_string(input: &str) -> Self {
+        let mut split = input.split(' ').map(hexparse).collect::<Vec<usize>>();
+        Self::new(split[0..split.len() - 1].to_vec(), *split.last().unwrap())
     }
 }
 

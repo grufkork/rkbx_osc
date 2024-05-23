@@ -44,7 +44,7 @@ As of 7.0.1 the offsets do not seem to change. I hope it continues this way.
 
 | Rekordbox Version  |
 | ----- |
-| 7.0.0 |
+| 7.0.1, 7.0.0 |
 | 6.8.5, 6.8.4, 6.8.3, 6.8.2, 6.7.7, 6.7.4, 6.7.3 |
 
 # Technical Details

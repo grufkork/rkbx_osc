@@ -1,5 +1,5 @@
 # Rekordbox OSC
-Connecting Rekordbox to visualizers and music software over Ableton Link and OSC
+Ableton Link & OSC support for Rekordbox, to connect to visualisers and music software
 
 ## What does it do?
 When run on the same computer as an instance of Rekordbox, it will read the current timing information and send this over your protocol of choice. By default it outputs a 4-beat aligned signal using Ableton Link, but it can also transmit equivalent data over OSC, although with less accurate timing. 
@@ -28,6 +28,15 @@ If no arguments are given, it defaults to the latest supported rekordbox version
  - `/beat`: the current beat fraction, as a float counting from 0 to 1
  - `/bpm`: the master deck tempo in BPM
 
+## Supported versions
+~~Any version not listed will 99% not work, but you can always try using an adjacent version.~~
+As of 7.0.1 the offsets do not seem to change. I hope it continues this way.
+
+| Rekordbox Version  |
+| ----- |
+| 7.0.1, 7.0.0 |
+| 6.8.5, 6.8.4, 6.8.3, 6.8.2, 6.7.7, 6.7.4, 6.7.3 |
+
 ## How it works
 The timing information is extracted through reading Rekordbox's memory. The program reads the current beat and measure from the text display on top of the large waveform, and detects when these change.
 When a change occurs, the beat fraction is set to 0 and then counts linearly upwards at a pace dictated by the master track BPM.
@@ -37,15 +46,6 @@ When a change occurs, the beat fraction is set to 0 and then counts linearly upw
 - Might register an extra beat when switching master deck.
 - Assumes 4/4 time signature - Rekordbox does not support anything else without manually editing the database
 - Windows only
-
-## Supported versions
-~~ Any version not listed will 99% not work, but you can always try using an adjacent version. ~~
-As of 7.0.1 the offsets do not seem to change. I hope it continues this way.
-
-| Rekordbox Version  |
-| ----- |
-| 7.0.1, 7.0.0 |
-| 6.8.5, 6.8.4, 6.8.3, 6.8.2, 6.7.7, 6.7.4, 6.7.3 |
 
 # Technical Details
 

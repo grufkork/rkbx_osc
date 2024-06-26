@@ -35,9 +35,9 @@ impl<T> Value<T> {
     fn new(h: HANDLE, base: usize, offsets: Pointer) -> Value<T> {
         let mut address = base;
 
-        for offset in offsets.offsets {
+        for offset in &offsets.offsets {
             address = read::<usize>(h, address + offset)
-                .expect("Memory read failed, check your Rekordbox version!");
+                .expect(&format!("\nMemory read failed, check your Rekordbox version! Try updating with -u.\nIf nothing works, wait for an update or send this entire error message to @grufkork. \n\nBase: {base:X}, Offsets: {offsets}"));
         }
         address += offsets.final_offset;
 

@@ -1,3 +1,4 @@
+use core::fmt;
 use std::{collections::HashMap, fs::File, io::Read};
 
 impl RekordboxOffsets {
@@ -67,6 +68,18 @@ impl Pointer {
     pub fn from_string(input: &str) -> Self {
         let split = input.split(' ').map(hexparse).collect::<Vec<usize>>();
         Self::new(split[0..split.len() - 1].to_vec(), *split.last().unwrap())
+    }
+}
+
+impl fmt::Display for Pointer {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let mut res = "[".to_string();
+        for offset in &self.offsets{
+            res += &format!("{offset:X}, ");
+        }
+        res += &format!("{:X}]", self.final_offset);
+
+        write!(f, "{res}")
     }
 }
 

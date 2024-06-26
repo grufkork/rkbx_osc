@@ -34,8 +34,8 @@ As of 7.0.1 the offsets do not seem to change. I hope it continues this way.
 
 | Rekordbox Version  |
 | ----- |
-| 7.0.1, 7.0.0 |
-| 6.8.5, 6.8.4, 6.8.3, 6.8.2, 6.7.7, 6.7.4, 6.7.3 |
+| `7.0.2`, `7.0.1`, `7.0.0` |
+| `6.8.5`, `6.8.4`, `6.8.3`, `6.8.2`, `6.7.7`, `6.7.4`, `6.7.3` |
 
 ## How it works
 The timing information is extracted through reading Rekordbox's memory. The program reads the current beat and measure from the text display on top of the large waveform, and detects when these change.

@@ -1,10 +1,15 @@
 # Rekordbox OSC
 Ableton Link & OSC support for Rekordbox, to connect to visualisers and music software
 
+# ⚠️  Expect a major update soon™!
+I'm looking to rewrite parts of the program to allow for easier and non-breaking updates of both offsets the executable itself, together with a notification system for when updates are available. Also, since RB v7 it seems the syncing is significantly more jittery. I will have to investigate this closer, and will probably fix that together with the ease of use update.
+
+If this software is of use for you, consider donating at my [ko-fi](https://ko-fi.com/grufkork) so I can spend more time on it. Keeping up with AlphaTheta (formerly Pioneer)'s continous lapse of judgement takes time and effort.
+
 ## What does it do?
 When run on the same computer as an instance of Rekordbox, it will read the current timing information and send this over your protocol of choice. By default it outputs a 4-beat aligned signal using Ableton Link, but it can also transmit equivalent data over OSC, although with less accurate timing. 
 
-The program does not interact with the audio stream in any way, but reads the onscreen text values through memory. Thus your beatgrid must be correct for it to work as expected. 
+The program does not interact with the audio stream in any way, but reads the onscreen text values through memory. It is therefore extremely accurate, although your beatgrid must be correct for it to work as expected.
 
 ## Why?
 Rekordbox's Ableton Link integration only allows for receiving a signal, not extracting it.
@@ -34,7 +39,7 @@ As of 7.0.1 the offsets do not seem to change. I hope it continues this way.
 
 | Rekordbox Version  |
 | ----- |
-| `7.0.2`, `7.0.1`, `7.0.0` |
+| `7.0.3`, `7.0.2`, `7.0.1`, `7.0.0` |
 | `6.8.5`, `6.8.4`, `6.8.3`, `6.8.2`, `6.7.7`, `6.7.4`, `6.7.3` |
 
 ## How it works

@@ -44,18 +44,26 @@ impl RekordboxOffsets {
         file.read_to_string(&mut contents).unwrap();
         drop(file);
 
+        let mut empty_line_count = 0;
+
         let mut map = HashMap::new();
 
         let mut lines = vec![];
         for line in contents.lines() {
             if line.is_empty() {
-                if !lines.is_empty() {
-                    let o = RekordboxOffsets::from_lines(&lines);
-                    map.insert(o.rbversion.clone(), o);
-                    lines.clear();
+                empty_line_count += 1;
+                if empty_line_count >= 2{
+                    if !lines.is_empty() {
+                        let o = RekordboxOffsets::from_lines(&lines);
+                        map.insert(o.rbversion.clone(), o);
+                        lines.clear();
+                    }
                 }
-            } else if !line.starts_with('#') {
+            } else {
+                empty_line_count = 0;
+                if !line.starts_with('#') {
                 lines.push(line.to_string());
+                }
             }
         }
 

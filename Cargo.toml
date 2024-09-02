@@ -12,3 +12,4 @@ toy-arms = {version = "0.9.4", features = ["external"]}
 winapi = "0.3.9"
 rosc = "0.10.1"
 rusty_link = "0.4.2"
+iced = "0.12.1"

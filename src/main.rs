@@ -124,7 +124,7 @@ pub struct BeatKeeper {
     rb: Rekordbox,
     last_beat: i32,
     beat_fraction: f32,
-    last_masterdeck_index: u8,
+    masterdeck_index: usize,
     offset_micros: f32,
     master_bpm: f32,
 }
@@ -135,7 +135,7 @@ impl BeatKeeper {
             rb: Rekordbox::new(offsets),
             last_beat: 0,
             beat_fraction: 1.,
-            last_masterdeck_index: 0,
+            masterdeck_index: 0,
             offset_micros: 0.,
             master_bpm: 120.,
         }
@@ -143,22 +143,20 @@ impl BeatKeeper {
 
     pub fn update(&mut self) -> f32 {
         self.master_bpm = self.rb.master_bpm.read();
-        let masterdeck_index = self.rb.masterdeck_index.read() as usize;
+        self.masterdeck_index = self.rb.masterdeck_index.read() as usize;
 
-        let samplerate = self.rb.sample_rates[masterdeck_index].read();
-        let sample_poisition = self.rb.sample_positions[masterdeck_index].read();
+        let samplerate = self.rb.sample_rates[self.masterdeck_index].read();
+        let sample_poisition = self.rb.sample_positions[self.masterdeck_index].read();
         let seconds_played = sample_poisition as f32 / samplerate as f32;
 
-        let grid_shift = self.rb.beatgrid_seconds[masterdeck_index].read();
-        let grid_beat = self.rb.beatgrid_beats[masterdeck_index].read() as f32;
-        let original_bpm = self.rb.original_bpms[masterdeck_index].read();
+        let grid_shift = self.rb.beatgrid_seconds[self.masterdeck_index].read();
+        let grid_beat = self.rb.beatgrid_beats[self.masterdeck_index].read() as f32;
+        let original_bpm = self.rb.original_bpms[self.masterdeck_index].read();
         let grid_size = 60. / original_bpm;
 
         let grid_origin = grid_shift as f32 + (grid_beat) * grid_size;
 
-        let beat = (seconds_played - grid_origin) / grid_size;
-
-        beat
+        (seconds_played - grid_origin) / grid_size
 
 
         // self.rb.update(); // Fetch values from rkbx memory
@@ -326,11 +324,7 @@ fn main() {
     link.capture_app_session_state(&mut state);
     link.enable(true);
 
-    // Due to Windows timers having a default resolution 0f 15.6ms, we need to use a "too high"
-    // value to acheive ~60Hz
-    let period = Duration::from_micros(1000000 / 120);
-
-    let mut last_instant = Instant::now();
+    let period = Duration::from_micros(1000000 / 50); // 50Hz
 
     let mut count = 0;
     let mut step = 0;
@@ -344,7 +338,7 @@ fn main() {
     loop {
         let master_beat = keeper.update(); // Get values, advance time
 
-        let bfrac = 0.5;//keeper.get_beat_faction();
+        let bfrac = master_beat % 1.;
 
         if let Some(socket) = &socket {
             let msg = OscPacket::Message(OscMessage {
@@ -423,7 +417,7 @@ fn main() {
                     }
                 })
                 .collect::<String>(),
-                keeper.last_masterdeck_index,
+                keeper.masterdeck_index,
                 master_beat,
                 keeper.offset_micros / 1000.,
                 link.num_peers(),

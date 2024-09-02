@@ -3,16 +3,39 @@ use std::{collections::HashMap, fs::File, io::Read};
 
 impl RekordboxOffsets {
     pub fn from_lines(lines: &[String]) -> RekordboxOffsets {
-        let mut rows = lines.iter();
-        RekordboxOffsets {
-            rbversion: rows.next().unwrap().to_string(),
-            deck1bar: Pointer::from_string(rows.next().unwrap()),
-            deck1beat: Pointer::from_string(rows.next().unwrap()),
-            deck2bar: Pointer::from_string(rows.next().unwrap()),
-            deck2beat: Pointer::from_string(rows.next().unwrap()),
-            master_bpm: Pointer::from_string(rows.next().unwrap()),
-            masterdeck_index: Pointer::from_string(rows.next().unwrap()),
+        let mut rows = lines.iter().peekable();
+
+        let rb_version = rows.next().unwrap().to_string();
+
+        let master_bpm = Pointer::from_string(rows.next().unwrap());
+        let masterdeck_index = Pointer::from_string(rows.next().unwrap());
+
+        let mut beatgrid_shift = vec![];
+        let mut beatgrid_beat = vec![];
+        let mut sample_position = vec![];
+        let mut sample_rate = vec![];
+        let mut original_bpm = vec![];
+
+        while rows.peek().is_some(){
+            original_bpm.push(Pointer::from_string(rows.next().unwrap()));
+            beatgrid_shift.push(Pointer::from_string(rows.next().unwrap()));
+            beatgrid_beat.push(Pointer::from_string(rows.next().unwrap()));
+            sample_position.push(Pointer::from_string(rows.next().unwrap()));
+            sample_rate.push(Pointer::from_string(rows.next().unwrap()));
         }
+
+        RekordboxOffsets {
+            rbversion: rb_version,
+            beatgrid_shift,
+            beatgrid_beat,
+            sample_position,
+            sample_rate,
+            original_bpm,
+            master_bpm,
+            masterdeck_index,
+        }
+
+
     }
 
     pub fn from_file(name: &str) -> HashMap<String, RekordboxOffsets> {
@@ -40,18 +63,19 @@ impl RekordboxOffsets {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct RekordboxOffsets {
     pub rbversion: String,
-    pub deck1bar: Pointer,
-    pub deck1beat: Pointer,
-    pub deck2bar: Pointer,
-    pub deck2beat: Pointer,
     pub master_bpm: Pointer,
     pub masterdeck_index: Pointer,
+    pub beatgrid_shift: Vec<Pointer>,
+    pub beatgrid_beat: Vec<Pointer>,
+    pub sample_position: Vec<Pointer>,
+    pub sample_rate: Vec<Pointer>,
+    pub original_bpm: Vec<Pointer>,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Pointer {
     pub offsets: Vec<usize>,
     pub final_offset: usize,

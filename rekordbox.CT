@@ -1,0 +1,182 @@
+<?xml version="1.0" encoding="utf-8"?>
+<CheatTable CheatEngineTableVersion="45">
+  <CheatEntries>
+    <CheatEntry>
+      <ID>0</ID>
+      <Description>"Seconds played"</Description>
+      <ShowAsSigned>1</ShowAsSigned>
+      <VariableType>4 Bytes</VariableType>
+      <Address>1CBA343D2D0</Address>
+    </CheatEntry>
+    <CheatEntry>
+      <ID>5</ID>
+      <Description>"No description"</Description>
+      <ShowAsSigned>0</ShowAsSigned>
+      <VariableType>Double</VariableType>
+      <Address>1CBA343D2D0</Address>
+    </CheatEntry>
+    <CheatEntry>
+      <ID>6</ID>
+      <Description>"No description"</Description>
+      <VariableType>4 Bytes</VariableType>
+      <Address>1CC02E6D04C</Address>
+    </CheatEntry>
+    <CheatEntry>
+      <ID>7</ID>
+      <Description>"No description"</Description>
+      <ShowAsSigned>0</ShowAsSigned>
+      <VariableType>8 Bytes</VariableType>
+      <Address>1CC02E6D048</Address>
+    </CheatEntry>
+    <CheatEntry>
+      <ID>8</ID>
+      <Description>"Beatgrid shift (s)"</Description>
+      <VariableType>Double</VariableType>
+      <Address>2186BEEEE80</Address>
+    </CheatEntry>
+    <CheatEntry>
+      <ID>9</ID>
+      <Description>"Beatgrid shift (steps)"</Description>
+      <VariableType>4 Bytes</VariableType>
+      <Address>2181D8CC7C8</Address>
+    </CheatEntry>
+    <CheatEntry>
+      <ID>13</ID>
+      <Description>"No description"</Description>
+      <VariableType>4 Bytes</VariableType>
+      <Address>1F161B5E398</Address>
+    </CheatEntry>
+    <CheatEntry>
+      <ID>10</ID>
+      <Description>"----"</Description>
+      <GroupHeader>1</GroupHeader>
+    </CheatEntry>
+    <CheatEntry>
+      <ID>11</ID>
+      <Description>"Shift(s)"</Description>
+      <VariableType>Double</VariableType>
+      <Address>1F114A6B2D0</Address>
+    </CheatEntry>
+    <CheatEntry>
+      <ID>12</ID>
+      <Description>"Shift(step)"</Description>
+      <VariableType>4 Bytes</VariableType>
+      <Address>1F11D215EC8</Address>
+    </CheatEntry>
+    <CheatEntry>
+      <ID>16</ID>
+      <Description>"Samplerate"</Description>
+      <VariableType>4 Bytes</VariableType>
+      <Address>1F113C1C04C</Address>
+    </CheatEntry>
+    <CheatEntry>
+      <ID>18</ID>
+      <Description>"Sample#"</Description>
+      <ShowAsSigned>1</ShowAsSigned>
+      <VariableType>8 Bytes</VariableType>
+      <Address>1F114A6B2C0</Address>
+    </CheatEntry>
+    <CheatEntry>
+      <ID>19</ID>
+      <Description>"Shift s"</Description>
+      <VariableType>Double</VariableType>
+      <Address>"rekordbox.exe"+0444BDF8</Address>
+      <Offsets>
+        <Offset>140</Offset>
+        <Offset>238</Offset>
+        <Offset>0</Offset>
+      </Offsets>
+    </CheatEntry>
+    <CheatEntry>
+      <ID>20</ID>
+      <Description>"Shift step"</Description>
+      <VariableType>4 Bytes</VariableType>
+      <Address>"rekordbox.exe"+0443F630</Address>
+      <Offsets>
+        <Offset>238</Offset>
+        <Offset>300</Offset>
+        <Offset>860</Offset>
+      </Offsets>
+    </CheatEntry>
+    <CheatEntry>
+      <ID>21</ID>
+      <Description>"Sample#"</Description>
+      <ShowAsSigned>1</ShowAsSigned>
+      <VariableType>8 Bytes</VariableType>
+      <Address>"rekordbox.exe"+0444BDF8</Address>
+      <Offsets>
+        <Offset>130</Offset>
+        <Offset>238</Offset>
+        <Offset>0</Offset>
+      </Offsets>
+    </CheatEntry>
+    <CheatEntry>
+      <ID>23</ID>
+      <Description>"Samplerate"</Description>
+      <VariableType>4 Bytes</VariableType>
+      <Address>"rekordbox.exe"+043C6B10</Address>
+      <Offsets>
+        <Offset>39C</Offset>
+        <Offset>8</Offset>
+      </Offsets>
+    </CheatEntry>
+    <CheatEntry>
+      <ID>22</ID>
+      <Description>"No description"</Description>
+      <VariableType>4 Bytes</VariableType>
+      <Address>29C5511B3BC</Address>
+    </CheatEntry>
+    <CheatEntry>
+      <ID>24</ID>
+      <Description>"Masterdeck index"</Description>
+      <VariableType>Byte</VariableType>
+      <Address>22034CC4788</Address>
+    </CheatEntry>
+    <CheatEntry>
+      <ID>25</ID>
+      <Description>"Masterdeck BPM"</Description>
+      <VariableType>Float</VariableType>
+      <Address>2203B0A4FD0</Address>
+    </CheatEntry>
+    <CheatEntry>
+      <ID>26</ID>
+      <Description>"True BPM"</Description>
+      <VariableType>Float</VariableType>
+      <Address>22077833448</Address>
+    </CheatEntry>
+    <CheatEntry>
+      <ID>27</ID>
+      <Description>"Masterdeck Index"</Description>
+      <VariableType>Byte</VariableType>
+      <Address>"rekordbox.exe"+0442C088</Address>
+      <Offsets>
+        <Offset>1068</Offset>
+        <Offset>220</Offset>
+        <Offset>0</Offset>
+      </Offsets>
+    </CheatEntry>
+    <CheatEntry>
+      <ID>28</ID>
+      <Description>"Masterdeck BPM"</Description>
+      <VariableType>Float</VariableType>
+      <Address>"rekordbox.exe"+04440240</Address>
+      <Offsets>
+        <Offset>140</Offset>
+        <Offset>0</Offset>
+        <Offset>1A8</Offset>
+        <Offset>18</Offset>
+      </Offsets>
+    </CheatEntry>
+    <CheatEntry>
+      <ID>29</ID>
+      <Description>"OG BPM"</Description>
+      <VariableType>Float</VariableType>
+      <Address>"rekordbox.exe"+0443F630</Address>
+      <Offsets>
+        <Offset>1C0</Offset>
+        <Offset>110</Offset>
+      </Offsets>
+    </CheatEntry>
+  </CheatEntries>
+  <UserdefinedSymbols/>
+</CheatTable>

@@ -1,6 +1,7 @@
 use rosc::{encoder::encode, OscMessage, OscPacket, OscType};
 use rusty_link::{AblLink, SessionState};
 use std::process::Command;
+use std::thread;
 use std::{
     env,
     io::{stdout, Write},
@@ -16,6 +17,8 @@ use winapi::um::winnt::HANDLE;
 
 mod offsets;
 use offsets::{Pointer, RekordboxOffsets};
+
+const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 extern "C" {
     fn _getch() -> core::ffi::c_char;
@@ -54,18 +57,24 @@ impl<T> Value<T> {
 }
 
 pub struct Rekordbox {
-    master_bpm_val: Value<f32>,
-    bar1_val: Value<i32>,
-    beat1_val: Value<i32>,
-    bar2_val: Value<i32>,
-    beat2_val: Value<i32>,
-    masterdeck_index_val: Value<u8>,
+    master_bpm: Value<f32>,
+    masterdeck_index: Value<u8>,
 
-    pub beats1: i32,
-    pub beats2: i32,
-    pub master_beats: i32,
-    pub master_bpm: f32,
-    pub masterdeck_index: u8,
+    original_bpms: Vec<Value<f32>>,
+    beatgrid_seconds: Vec<Value<f64>>,
+    beatgrid_beats: Vec<Value<i32>>,
+    sample_positions: Vec<Value<i64>>,
+    sample_rates: Vec<Value<u32>>,
+
+
+    deckcount: usize,
+}
+
+fn pointers_to_vals<T>(h: HANDLE, base: usize, pointers: Vec<Pointer>) -> Vec<Value<T>> {
+    pointers
+        .iter()
+        .map(|x| Value::new(h, base, x.clone()))
+        .collect()
 }
 
 impl Rekordbox {
@@ -78,148 +87,118 @@ impl Rekordbox {
 
         let master_bpm_val: Value<f32> = Value::new(h, base, offsets.master_bpm);
 
-        let bar1_val: Value<i32> = Value::new(h, base, offsets.deck1bar);
-        let beat1_val: Value<i32> = Value::new(h, base, offsets.deck1beat);
-        let bar2_val: Value<i32> = Value::new(h, base, offsets.deck2bar);
-        let beat2_val: Value<i32> = Value::new(h, base, offsets.deck2beat);
+        let original_bpms = pointers_to_vals(h, base, offsets.original_bpm);
+        let beatgrid_shifts = pointers_to_vals(h, base, offsets.beatgrid_shift);
+        let beatgrid_beats = pointers_to_vals(h, base, offsets.beatgrid_beat);
+        let sample_positions = pointers_to_vals(h, base, offsets.sample_position);
+        let sample_rates = pointers_to_vals(h, base, offsets.sample_rate);
+                
+        let deckcount = beatgrid_shifts.len();
+
 
         let masterdeck_index_val: Value<u8> = Value::new(h, base, offsets.masterdeck_index);
 
         Self {
-            master_bpm_val,
-            bar1_val,
-            beat1_val,
-            bar2_val,
-            beat2_val,
-
-            masterdeck_index_val,
-
-            beats1: -1,
-            beats2: -1,
-            master_bpm: 120.0,
-            masterdeck_index: 0,
-            master_beats: 0,
+            master_bpm: master_bpm_val,
+            original_bpms,
+            beatgrid_seconds: beatgrid_shifts,
+            beatgrid_beats,
+            sample_positions,
+            sample_rates,
+            masterdeck_index: masterdeck_index_val,
+            deckcount,
         }
     }
 
     fn update(&mut self) {
-        self.master_bpm = self.master_bpm_val.read();
-        self.beats1 = self.bar1_val.read() * 4 + self.beat1_val.read();
-        self.beats2 = self.bar2_val.read() * 4 + self.beat2_val.read();
-        self.masterdeck_index = self.masterdeck_index_val.read();
+        // self.master_bpm = self.master_bpm.read();
+        
 
-        self.master_beats = if self.masterdeck_index == 0 {
-            self.beats1
-        } else {
-            self.beats2
-        };
+        // self.masterdeck_index = self.masterdeck_index.read();
+
+        // self.master_beats = self.beats[self.masterdeck_index as usize];
     }
 }
 
 pub struct BeatKeeper {
-    rb: Option<Rekordbox>,
+    rb: Rekordbox,
     last_beat: i32,
-    pub beat_fraction: f32,
-    pub last_masterdeck_index: u8,
-    pub offset_micros: f32,
-    pub last_bpm: f32,
-    pub new_beat: bool,
+    beat_fraction: f32,
+    last_masterdeck_index: u8,
+    offset_micros: f32,
+    master_bpm: f32,
 }
 
 impl BeatKeeper {
     pub fn new(offsets: RekordboxOffsets) -> Self {
         BeatKeeper {
-            rb: Some(Rekordbox::new(offsets)),
+            rb: Rekordbox::new(offsets),
             last_beat: 0,
             beat_fraction: 1.,
             last_masterdeck_index: 0,
             offset_micros: 0.,
-            last_bpm: 0.,
-            new_beat: false,
+            master_bpm: 120.,
         }
     }
 
-    pub fn dummy() -> Self {
-        BeatKeeper {
-            rb: None,
-            last_beat: 0,
-            beat_fraction: 1.,
-            last_masterdeck_index: 0,
-            offset_micros: 0.,
-            last_bpm: 0.,
-            new_beat: false,
+    pub fn update(&mut self) -> f32 {
+        self.master_bpm = self.rb.master_bpm.read();
+        let masterdeck_index = self.rb.masterdeck_index.read() as usize;
+
+        let samplerate = self.rb.sample_rates[masterdeck_index].read();
+        let sample_poisition = self.rb.sample_positions[masterdeck_index].read();
+        let seconds_played = sample_poisition as f32 / samplerate as f32;
+
+        let grid_shift = self.rb.beatgrid_seconds[masterdeck_index].read();
+        let grid_beat = self.rb.beatgrid_beats[masterdeck_index].read() as f32;
+        let original_bpm = self.rb.original_bpms[masterdeck_index].read();
+        let grid_size = 60. / original_bpm;
+
+        let grid_origin = grid_shift as f32 + (grid_beat) * grid_size;
+
+        let beat = (seconds_played - grid_origin) / grid_size;
+
+        beat
+
+
+        // self.rb.update(); // Fetch values from rkbx memory
+
+        /*if self.rb.masterdeck_index != self.last_masterdeck_index {
+            self.last_masterdeck_index = self.rb.masterdeck_index;
+            self.last_beat = self.rb.master_beats;
         }
-    }
 
-    pub fn update(&mut self, delta: Duration) {
-        if let Some(rb) = &mut self.rb {
-            let beats_per_micro = rb.master_bpm / 60. / 1000000.;
-
-            rb.update(); // Fetch values from rkbx memory
-
-            if rb.masterdeck_index != self.last_masterdeck_index {
-                self.last_masterdeck_index = rb.masterdeck_index;
-                self.last_beat = rb.master_beats;
-            }
-
-            if (rb.master_beats - self.last_beat).abs() > 0 {
-                self.last_beat = rb.master_beats;
-                self.beat_fraction = 0.;
-                self.new_beat = true;
-            }
-            self.beat_fraction =
-                (self.beat_fraction + delta.as_micros() as f32 * beats_per_micro) % 1.;
-        } else {
-            self.beat_fraction = (self.beat_fraction + delta.as_secs_f32() * 130. / 60.) % 1.;
+        if (self.rb.master_beats - self.last_beat).abs() > 0 {
+            self.last_beat = self.rb.master_beats;
+            self.beat_fraction = 0.;
+            self.new_beat = true;
         }
+        self.beat_fraction =
+            (self.beat_fraction + delta.as_micros() as f32 * beats_per_micro) % 1.;
     }
     pub fn get_beat_faction(&mut self) -> f32 {
-        (self.beat_fraction
-            + if let Some(rb) = &self.rb {
-                let beats_per_micro = rb.master_bpm / 60. / 1000000.;
-                self.offset_micros * beats_per_micro
-            } else {
-                0.
-            }
-            + 1.)
-            % 1.
-    }
-
-    pub fn get_bpm_changed(&mut self) -> Option<f32> {
-        if let Some(rb) = &self.rb {
-            if rb.master_bpm != self.last_bpm {
-                self.last_bpm = rb.master_bpm;
-                return Some(rb.master_bpm);
-            }
-        }
-        None
-    }
-
-    pub fn get_new_beat(&mut self) -> bool {
-        if self.new_beat {
-            self.new_beat = false;
-            return true;
-        }
-        false
-    }
-
-    pub fn change_beat_offset(&mut self, offset: f32) {
-        self.offset_micros += offset;
+        let beats_per_micro = self.rb.master_bpm / 60. / 1000000.;
+        (self.beat_fraction + self.offset_micros * beats_per_micro + 1.)% 1.*/
     }
 }
 
 const CHARS: [&str; 4] = ["|", "/", "-", "\\"];
 
 fn main() {
+    println!("Rekordbox OSC v{}", VERSION);
+    println!("Checking for updates...");
+
+
+
     if !Path::new("./offsets").exists() {
         println!("Offsets not found, downloading from repo...");
         download_offsets();
     }
 
-    let (tx, rx) = channel::<i8>();
+    /*let (tx, rx) = channel::<i8>();
     spawn(move || loop {
         tx.send(getch()).unwrap();
-    });
+    });*/
 
     let args: Vec<String> = env::args().collect();
 
@@ -262,33 +241,33 @@ fn main() {
                         "h" => {
                             println!(
                                 " - Rekordbox OSC v{} -
-A tool for sending Rekordbox timing data to visualizers using OSC
+                                A tool for sending Rekordbox timing data to visualizers using OSC
 
-Flags:
+                                Flags:
 
- -h  Print this help
- -u  Fetch latest offset list from GitHub and exit
- -v  Rekordbox version to target, eg. 6.7.3
+                                -h  Print this help
+                                -u  Fetch latest offset list from GitHub and exit
+                                -v  Rekordbox version to target, eg. 6.7.3
 
--- OSC --
- -o  Enable OSC
- -s  Source address, eg. 127.0.0.1:1337
- -t  Target address, eg. 192.168.1.56:6667
+                                -- OSC --
+                                -o  Enable OSC
+                                -s  Source address, eg. 127.0.0.1:1337
+                                -t  Target address, eg. 192.168.1.56:6667
 
-Use i/k to change the beat offset by +/- 1ms
+                                Use i/k to change the beat offset by +/- 1ms
 
-Current default version: {}
-Available versions:",
+                                Current default version: {}
+                                Available versions:",
                                 env!("CARGO_PKG_VERSION"),
                                 versions[0]
-                            );
-                            println!("{}", versions.join(", "));
+                                    );
+                                println!("{}", versions.join(", "));
 
-                            /*for v in  {
-                                print!("{v}, ");
-                            }*/
-                            println!();
-                            return;
+                                /*for v in  {
+                                  print!("{v}, ");
+                                  }*/
+                                println!();
+                                return;
                         }
 
                         c => {
@@ -358,14 +337,14 @@ Available versions:",
 
     let mut stdout = stdout();
 
+    let mut last_bpm = 120.;
+
+
     println!("Entering loop");
     loop {
-        let delta = Instant::now() - last_instant; // Is this timer accurate enough?
-        last_instant = Instant::now();
+        let master_beat = keeper.update(); // Get values, advance time
 
-        keeper.update(delta); // Get values, advance time
-
-        let bfrac = keeper.get_beat_faction();
+        let bfrac = 0.5;//keeper.get_beat_faction();
 
         if let Some(socket) = &socket {
             let msg = OscPacket::Message(OscMessage {
@@ -376,21 +355,31 @@ Available versions:",
             socket.send(&packet[..]).unwrap();
         }
 
-        if let Some(bpm) = keeper.get_bpm_changed() {
-            state.set_tempo(bpm.into(), link.clock_micros());
+        if keeper.master_bpm != last_bpm {
+            state.set_tempo(keeper.master_bpm.into(), link.clock_micros());
             link.commit_app_session_state(&state);
 
             if let Some(socket) = &socket {
                 let msg = OscPacket::Message(OscMessage {
                     addr: "/bpm".to_string(),
-                    args: vec![OscType::Float(bpm)],
+                    args: vec![OscType::Float(keeper.master_bpm)],
                 });
                 let packet = encode(&msg).unwrap();
                 socket.send(&packet[..]).unwrap();
             }
+
+            last_bpm = keeper.master_bpm;
         }
 
-        if keeper.get_new_beat() {
+        let current_link_beat_approx = state.beat_at_time(link.clock_micros(), 4.).round();
+        let target_beat = ((master_beat as f64) % 4. - current_link_beat_approx % 4. + 4.)
+            % 4.
+            + current_link_beat_approx
+            - 1.; // Ensure the 1 is on the 1
+
+            state.request_beat_at_time(target_beat, link.clock_micros(), 4.);
+            link.commit_app_session_state(&state);
+        /*if keeper.get_new_beat() {
             let current_link_beat_approx = state.beat_at_time(link.clock_micros(), 4.).round();
             let target_beat = ((keeper.last_beat as f64) % 4. - current_link_beat_approx % 4. + 4.)
                 % 4.
@@ -399,9 +388,9 @@ Available versions:",
 
             state.request_beat_at_time(target_beat, link.clock_micros(), 4.);
             link.commit_app_session_state(&state);
-        }
+        }*/
 
-        while let Ok(key) = rx.try_recv() {
+        /*while let Ok(key) = rx.try_recv() {
             match key {
                 99 => {
                     //"c"
@@ -415,7 +404,7 @@ Available versions:",
                 }
                 _ => (),
             }
-        }
+        }*/
 
         if count % 20 == 0 {
             step = (step + 1) % 4;
@@ -423,7 +412,7 @@ Available versions:",
             let frac = (keeper.last_beat - 1) % 4;
 
             print!(
-                "\rRunning {} [{}] Deck {}     OSC Offset: {}ms     Frq: {: >3}Hz    Peers:{}   BPM:{}    ",
+                "\rRunning {} [{}] Deck {}    Pos {}  OSC Offset: {}ms     Peers:{}   BPM:{}    ",
                 CHARS[step],
                 (0..4)
                 .map(|i| {
@@ -435,11 +424,11 @@ Available versions:",
                 })
                 .collect::<String>(),
                 keeper.last_masterdeck_index,
+                master_beat,
                 keeper.offset_micros / 1000.,
-                1000000 / (delta.as_micros().max(1)),
                 link.num_peers(),
-                keeper.last_bpm
-                );
+                keeper.master_bpm
+            );
 
             stdout.flush().unwrap();
         }
@@ -457,12 +446,15 @@ fn download_offsets() {
             "https://raw.githubusercontent.com/grufkork/rkbx_osc/master/offsets",
         ])
         .output()
-    {
-        Ok(output) => {
-            println!("{}", String::from_utf8(output.stdout).unwrap());
-            println!("{}", String::from_utf8(output.stderr).unwrap());
+        {
+            Ok(output) => {
+                println!("{}", String::from_utf8(output.stdout).unwrap());
+                println!("{}", String::from_utf8(output.stderr).unwrap());
+            }
+            Err(error) => println!("{}", error),
         }
-        Err(error) => println!("{}", error),
-    }
     println!("Done!");
 }
+
+
+// !cargo r -- -v 6.8.5

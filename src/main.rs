@@ -1,6 +1,11 @@
+use application::{AppToKeeperMessage, Flag, KeeperToAppMessage};
+use iced::window::Settings;
+use iced::{Application};
+use outputmodules::{OutputModule, OutputModules};
 use rosc::{encoder::encode, OscMessage, OscPacket, OscType};
 use rusty_link::{AblLink, SessionState};
 use std::process::Command;
+use std::sync::mpsc::{self, Receiver, Sender};
 use std::thread;
 use std::{
     env,
@@ -8,7 +13,6 @@ use std::{
     marker::PhantomData,
     net::UdpSocket,
     path::Path,
-    sync::mpsc::channel,
     thread::{sleep, spawn},
     time::{Duration, Instant},
 };
@@ -17,6 +21,9 @@ use winapi::um::winnt::HANDLE;
 
 mod offsets;
 use offsets::{Pointer, RekordboxOffsets};
+
+mod application;
+mod outputmodules;
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -59,14 +66,11 @@ impl<T> Value<T> {
 pub struct Rekordbox {
     master_bpm: Value<f32>,
     masterdeck_index: Value<u8>,
-
     original_bpms: Vec<Value<f32>>,
     beatgrid_seconds: Vec<Value<f64>>,
     beatgrid_beats: Vec<Value<i32>>,
     sample_positions: Vec<Value<i64>>,
     sample_rates: Vec<Value<u32>>,
-
-
     deckcount: usize,
 }
 
@@ -127,17 +131,45 @@ pub struct BeatKeeper {
     masterdeck_index: usize,
     offset_micros: f32,
     master_bpm: f32,
+    last_master_bpm: f32,
+    running_modules: Vec<Box<dyn OutputModule>>,
+    rx: Receiver<AppToKeeperMessage>,
+    tx: Sender<KeeperToAppMessage>,
+    
 }
 
 impl BeatKeeper {
-    pub fn new(offsets: RekordboxOffsets) -> Self {
+    pub fn new(offsets: RekordboxOffsets, modules: Vec<(outputmodules::OutputModules, bool)>, rx: Receiver<AppToKeeperMessage>, tx: Sender<KeeperToAppMessage>) -> Self {
+
+        let mut running_modules = vec![];
+
+        for (module, active) in modules{
+            if !active{
+                continue;
+            }
+
+            match module{
+                OutputModules::AbletonLink => {
+                    running_modules.push(outputmodules::abletonlink::AbletonLink::new());
+                },
+                OutputModules::OSC => {
+
+                }
+            }
+        }
+
+
         BeatKeeper {
+            rx,
+            tx,
             rb: Rekordbox::new(offsets),
             last_beat: 0,
             beat_fraction: 1.,
             masterdeck_index: 0,
             offset_micros: 0.,
             master_bpm: 120.,
+            last_master_bpm: 120.,
+            running_modules,
         }
     }
 
@@ -156,27 +188,19 @@ impl BeatKeeper {
 
         let grid_origin = grid_shift as f32 + (grid_beat) * grid_size;
 
-        (seconds_played - grid_origin) / grid_size
+        let beat = (seconds_played - grid_origin) / grid_size;
 
+        let bpm_changed = self.master_bpm != self.last_master_bpm;
 
-        // self.rb.update(); // Fetch values from rkbx memory
-
-        /*if self.rb.masterdeck_index != self.last_masterdeck_index {
-            self.last_masterdeck_index = self.rb.masterdeck_index;
-            self.last_beat = self.rb.master_beats;
+        for module in &mut self.running_modules{
+            module.beat_update(beat);
+            if bpm_changed{
+                module.bpm_changed(self.master_bpm);
+            }
         }
+        self.last_master_bpm = self.master_bpm;
 
-        if (self.rb.master_beats - self.last_beat).abs() > 0 {
-            self.last_beat = self.rb.master_beats;
-            self.beat_fraction = 0.;
-            self.new_beat = true;
-        }
-        self.beat_fraction =
-            (self.beat_fraction + delta.as_micros() as f32 * beats_per_micro) % 1.;
-    }
-    pub fn get_beat_faction(&mut self) -> f32 {
-        let beats_per_micro = self.rb.master_bpm / 60. / 1000000.;
-        (self.beat_fraction + self.offset_micros * beats_per_micro + 1.)% 1.*/
+        beat
     }
 }
 
@@ -194,9 +218,9 @@ fn main() {
     }
 
     /*let (tx, rx) = channel::<i8>();
-    spawn(move || loop {
-        tx.send(getch()).unwrap();
-    });*/
+      spawn(move || loop {
+      tx.send(getch()).unwrap();
+      });*/
 
     let args: Vec<String> = env::args().collect();
 
@@ -206,6 +230,9 @@ fn main() {
     let mut osc_enabled = false;
 
     let version_offsets = RekordboxOffsets::from_file("offsets");
+    crate::application::App::run(iced::settings::Settings::default());
+
+
     let mut versions: Vec<String> = version_offsets.keys().map(|x| x.to_string()).collect();
     versions.sort();
     versions.reverse();
@@ -316,7 +343,7 @@ fn main() {
     );
     println!();
 
-    let mut keeper = BeatKeeper::new(offsets.clone());
+    /*let mut keeper = BeatKeeper::new(offsets.clone());
     let link = AblLink::new(120.);
     link.enable(false);
 
@@ -371,36 +398,38 @@ fn main() {
             + current_link_beat_approx
             - 1.; // Ensure the 1 is on the 1
 
-            state.request_beat_at_time(target_beat, link.clock_micros(), 4.);
-            link.commit_app_session_state(&state);
-        /*if keeper.get_new_beat() {
-            let current_link_beat_approx = state.beat_at_time(link.clock_micros(), 4.).round();
-            let target_beat = ((keeper.last_beat as f64) % 4. - current_link_beat_approx % 4. + 4.)
-                % 4.
-                + current_link_beat_approx
-                - 1.; // Ensure the 1 is on the 1
+        let target_beat = (master_beat as f64 + 1.) % 4.;
 
-            state.request_beat_at_time(target_beat, link.clock_micros(), 4.);
-            link.commit_app_session_state(&state);
-        }*/
+        state.force_beat_at_time(target_beat, link.clock_micros() as u64, 4.);
+        link.commit_app_session_state(&state);
+        /*if keeper.get_new_beat() {
+          let current_link_beat_approx = state.beat_at_time(link.clock_micros(), 4.).round();
+          let target_beat = ((keeper.last_beat as f64) % 4. - current_link_beat_approx % 4. + 4.)
+          % 4
+          + current_link_beat_approx
+          - 1.; // Ensure the 1 is on the 1
+
+          state.request_beat_at_time(target_beat, link.clock_micros(), 4.);
+          link.commit_app_session_state(&state);
+          }*/
 
         /*while let Ok(key) = rx.try_recv() {
-            match key {
-                99 => {
-                    //"c"
-                    return;
-                }
-                105 => {
-                    keeper.change_beat_offset(1000.);
-                }
-                107 => {
-                    keeper.change_beat_offset(-1000.);
-                }
-                _ => (),
-            }
+          match key {
+          99 => {
+        //"c"
+        return;
+        }
+        105 => {
+        keeper.change_beat_offset(1000.);
+        }
+        107 => {
+        keeper.change_beat_offset(-1000.);
+        }
+        _ => (),
+        }
         }*/
 
-        if count % 20 == 0 {
+        if count % 5 == 0 {
             step = (step + 1) % 4;
 
             let frac = (keeper.last_beat - 1) % 4;
@@ -418,7 +447,7 @@ fn main() {
                 })
                 .collect::<String>(),
                 keeper.masterdeck_index,
-                master_beat,
+                master_beat%4.,
                 keeper.offset_micros / 1000.,
                 link.num_peers(),
                 keeper.master_bpm
@@ -429,7 +458,7 @@ fn main() {
         count = (count + 1) % 120;
 
         sleep(period);
-    }
+    }*/
 }
 
 fn download_offsets() {
@@ -449,6 +478,7 @@ fn download_offsets() {
         }
     println!("Done!");
 }
+
 
 
 // !cargo r -- -v 6.8.5

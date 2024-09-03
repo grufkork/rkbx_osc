@@ -1,6 +1,8 @@
 use core::fmt;
 use std::{collections::HashMap, fs::File, io::Read};
 
+pub type RekordboxOffsetCollection = HashMap<String, RekordboxOffsets>;
+
 impl RekordboxOffsets {
     pub fn from_lines(lines: &[String]) -> RekordboxOffsets {
         let mut rows = lines.iter().peekable();

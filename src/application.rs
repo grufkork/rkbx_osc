@@ -10,7 +10,7 @@ use iced::widget::pick_list;
 use iced::Command;
 use iced::Subscription;
 use iced::Element;
-use iced::widget::{button, column, row, text};
+use iced::widget::{button, column, row, text, Checkbox};
 use iced::Theme;
 use std::sync::mpsc;
 
@@ -32,24 +32,41 @@ pub enum KeeperToAppMessage {
 pub enum AppToKeeperMessage {
 }
 
+enum UpdateCheckState{
+    Checking,
+    UpToDate,
+    OffsetUpdateAvailable(String),
+    ExecutableUpdateAvailable(String),
+    Failed
+}
+
+enum AppState{
+    Idling,
+    UpdatingOffsets,
+    Running
+}
+
 pub struct App {
     beat: f32,
     offsets: RekordboxOffsetCollection,
     keeper_to_app_sender: std::sync::mpsc::Sender<KeeperToAppMessage>,
     receiver: RefCell<Option<mpsc::Receiver<KeeperToAppMessage>>>,
-    started: bool,
+    state: AppState,
     versions: Vec<String>,
     selected_version: String,
     keeper: Option<BeatKeeper>,
     modules: Vec<(OutputModules, bool)>,
-    app_to_keeper_sender: Option<mpsc::Sender<AppToKeeperMessage>>
+    app_to_keeper_sender: Option<mpsc::Sender<AppToKeeperMessage>>,
+    update_check_state: UpdateCheckState
 }
 
 #[derive(Debug, Clone)]
 pub enum Msg {
     KeeperMessage(KeeperToAppMessage),
     Start,
-    VersionSelected(String)
+    VersionSelected(String),
+    ToggleModule(usize),
+    UpdateOffsets
 }
 
 impl iced::Application for App {
@@ -77,11 +94,12 @@ impl iced::Application for App {
             receiver: RefCell::new(Some(rx)),
             offsets,
             beat: 0.,
-            started: false,
+            state: AppState::Idling,
             selected_version: versions[0].clone(),
             versions,
             keeper: None,
-            modules
+            modules,
+            update_check_state: UpdateCheckState::Checking
 
         }, Command::none())
     }
@@ -96,22 +114,28 @@ impl iced::Application for App {
 
             },
             Msg::Start => {
-                self.started = true;
+                self.state = AppState::Running;
 
                 let (tx, rx) = std::sync::mpsc::channel::<AppToKeeperMessage>();
-                
-                self.keeper = Some(BeatKeeper::new(
-                        self.offsets.get(&self.selected_version).unwrap().clone(),
-                        self.modules.clone(),
-                        rx,
-                        self.keeper_to_app_sender.clone()));
-                                
+
+                BeatKeeper::start(
+                    self.offsets.get(&self.selected_version).unwrap().clone(),
+                    self.modules.clone(),
+                    rx,
+                    self.keeper_to_app_sender.clone());
+
 
 
 
             },
             Msg::VersionSelected(version) => {
                 self.selected_version = version;
+
+            },
+            Msg::ToggleModule(idx )=> {
+                self.modules[idx].1 = !self.modules[idx].1;
+            },
+            Msg::UpdateOffsets => {
 
             }
         };
@@ -128,14 +152,47 @@ impl iced::Application for App {
 
 
     fn view(&self) -> Element<Msg> {
-        if self.started{
-            text("Link started").into()
-        }else{
-            column!(
-                text(format!("Beat: {}", self.beat)).size(16),
-                button("Start").on_press(Msg::Start),
-                pick_list([String::from("6.8.5"), String::from("7.0.3")], Some(String::from("6.8.5")), Msg::VersionSelected)
-            ).into()
+        match self.state{
+            AppState::Running => {
+                text("Link started").into()
+            }
+            AppState::Idling => {
+                column!(
+                    text(format!("Beat: {}", self.beat)).size(16),
+                    button("Start").on_press(Msg::Start).width(100),
+                    pick_list(self.versions.clone(), Some(self.selected_version.clone()), Msg::VersionSelected),
+                    column(self.modules.iter().enumerate().map(|(i, (module, enabled))| {
+                        row([
+                            Checkbox::new("", *enabled).on_toggle(move |_|  {Msg::ToggleModule(i)}).into(),
+                            // button(["Off", "On"][*enabled as usize]).on_press(Msg::ToggleModule(i)).into(),
+
+                            text(format!("{}", module)).into()
+                        ]).into()
+                    })),
+                    row({
+                        let mut content = vec![
+                            text( 
+                                match &self.update_check_state{
+                                    UpdateCheckState::Checking => "Checking for updates...".to_string(),
+                                    UpdateCheckState::UpToDate => "Up to date!".to_string(),
+                                    UpdateCheckState::OffsetUpdateAvailable(version) => format!("Offset update available: {}", version.clone()),
+                                    UpdateCheckState::ExecutableUpdateAvailable(version) => format!("Executable update available: {}. Download the latest version from github.com", version.clone()),
+                                    UpdateCheckState::Failed => "Update check failed".to_string()
+                                }).into()
+                        ];
+
+                        if let UpdateCheckState::OffsetUpdateAvailable(_) = self.update_check_state{
+                            content.push(button("Update offsets").on_press(Msg::UpdateOffsets).into());
+                        }
+
+                        content
+                    })
+                ).into()
+
+            },
+            AppState::UpdatingOffsets => {
+                text("Updating offsets").into()
+            }
         }
     }
 

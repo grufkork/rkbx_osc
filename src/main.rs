@@ -139,38 +139,47 @@ pub struct BeatKeeper {
 }
 
 impl BeatKeeper {
-    pub fn new(offsets: RekordboxOffsets, modules: Vec<(outputmodules::OutputModules, bool)>, rx: Receiver<AppToKeeperMessage>, tx: Sender<KeeperToAppMessage>) -> Self {
+    pub fn start(offsets: RekordboxOffsets, modules: Vec<(outputmodules::OutputModules, bool)>, rx: Receiver<AppToKeeperMessage>, tx: Sender<KeeperToAppMessage>){
 
-        let mut running_modules = vec![];
+        thread::spawn(move || {
+            let mut running_modules = vec![];
 
-        for (module, active) in modules{
-            if !active{
-                continue;
-            }
+            for (module, active) in modules{
+                if !active{
+                    continue;
+                }
 
-            match module{
-                OutputModules::AbletonLink => {
-                    running_modules.push(outputmodules::abletonlink::AbletonLink::new());
-                },
-                OutputModules::OSC => {
+                match module{
+                    OutputModules::AbletonLink => {
+                        running_modules.push(outputmodules::abletonlink::AbletonLink::new());
+                    },
+                    OutputModules::OSC => {
 
+                    }
                 }
             }
-        }
 
 
-        BeatKeeper {
-            rx,
-            tx,
-            rb: Rekordbox::new(offsets),
-            last_beat: 0,
-            beat_fraction: 1.,
-            masterdeck_index: 0,
-            offset_micros: 0.,
-            master_bpm: 120.,
-            last_master_bpm: 120.,
-            running_modules,
-        }
+            let mut keeper = BeatKeeper {
+                rx,
+                tx,
+                rb: Rekordbox::new(offsets),
+                last_beat: 0,
+                beat_fraction: 1.,
+                masterdeck_index: 0,
+                offset_micros: 0.,
+                master_bpm: 120.,
+                last_master_bpm: 120.,
+                running_modules,
+            };
+
+            let period = Duration::from_micros(1000000 / 50); // 50Hz
+            loop{
+                keeper.update();
+                thread::sleep(period);
+            }
+
+        });
     }
 
     pub fn update(&mut self) -> f32 {
@@ -344,121 +353,121 @@ fn main() {
     println!();
 
     /*let mut keeper = BeatKeeper::new(offsets.clone());
-    let link = AblLink::new(120.);
-    link.enable(false);
+      let link = AblLink::new(120.);
+      link.enable(false);
 
-    let mut state = SessionState::new();
-    link.capture_app_session_state(&mut state);
-    link.enable(true);
+      let mut state = SessionState::new();
+      link.capture_app_session_state(&mut state);
+      link.enable(true);
 
-    let period = Duration::from_micros(1000000 / 50); // 50Hz
+      let period = Duration::from_micros(1000000 / 50); // 50Hz
 
-    let mut count = 0;
-    let mut step = 0;
+      let mut count = 0;
+      let mut step = 0;
 
-    let mut stdout = stdout();
+      let mut stdout = stdout();
 
-    let mut last_bpm = 120.;
+      let mut last_bpm = 120.;
 
 
-    println!("Entering loop");
-    loop {
-        let master_beat = keeper.update(); // Get values, advance time
+      println!("Entering loop");
+      loop {
+      let master_beat = keeper.update(); // Get values, advance time
 
-        let bfrac = master_beat % 1.;
+      let bfrac = master_beat % 1.;
 
-        if let Some(socket) = &socket {
-            let msg = OscPacket::Message(OscMessage {
-                addr: "/beat".to_string(),
-                args: vec![OscType::Float(bfrac)],
-            });
-            let packet = encode(&msg).unwrap();
-            socket.send(&packet[..]).unwrap();
-        }
+      if let Some(socket) = &socket {
+      let msg = OscPacket::Message(OscMessage {
+      addr: "/beat".to_string(),
+      args: vec![OscType::Float(bfrac)],
+      });
+      let packet = encode(&msg).unwrap();
+      socket.send(&packet[..]).unwrap();
+      }
 
-        if keeper.master_bpm != last_bpm {
-            state.set_tempo(keeper.master_bpm.into(), link.clock_micros());
-            link.commit_app_session_state(&state);
+      if keeper.master_bpm != last_bpm {
+      state.set_tempo(keeper.master_bpm.into(), link.clock_micros());
+      link.commit_app_session_state(&state);
 
-            if let Some(socket) = &socket {
-                let msg = OscPacket::Message(OscMessage {
-                    addr: "/bpm".to_string(),
-                    args: vec![OscType::Float(keeper.master_bpm)],
-                });
-                let packet = encode(&msg).unwrap();
-                socket.send(&packet[..]).unwrap();
-            }
+      if let Some(socket) = &socket {
+      let msg = OscPacket::Message(OscMessage {
+      addr: "/bpm".to_string(),
+      args: vec![OscType::Float(keeper.master_bpm)],
+      });
+      let packet = encode(&msg).unwrap();
+      socket.send(&packet[..]).unwrap();
+      }
 
-            last_bpm = keeper.master_bpm;
-        }
+      last_bpm = keeper.master_bpm;
+      }
 
-        let current_link_beat_approx = state.beat_at_time(link.clock_micros(), 4.).round();
-        let target_beat = ((master_beat as f64) % 4. - current_link_beat_approx % 4. + 4.)
-            % 4.
-            + current_link_beat_approx
-            - 1.; // Ensure the 1 is on the 1
+      let current_link_beat_approx = state.beat_at_time(link.clock_micros(), 4.).round();
+      let target_beat = ((master_beat as f64) % 4. - current_link_beat_approx % 4. + 4.)
+      % 4.
+      + current_link_beat_approx
+      - 1.; // Ensure the 1 is on the 1
 
-        let target_beat = (master_beat as f64 + 1.) % 4.;
+      let target_beat = (master_beat as f64 + 1.) % 4.;
 
-        state.force_beat_at_time(target_beat, link.clock_micros() as u64, 4.);
-        link.commit_app_session_state(&state);
-        /*if keeper.get_new_beat() {
-          let current_link_beat_approx = state.beat_at_time(link.clock_micros(), 4.).round();
-          let target_beat = ((keeper.last_beat as f64) % 4. - current_link_beat_approx % 4. + 4.)
-          % 4
-          + current_link_beat_approx
-          - 1.; // Ensure the 1 is on the 1
+      state.force_beat_at_time(target_beat, link.clock_micros() as u64, 4.);
+      link.commit_app_session_state(&state);
+    /*if keeper.get_new_beat() {
+    let current_link_beat_approx = state.beat_at_time(link.clock_micros(), 4.).round();
+    let target_beat = ((keeper.last_beat as f64) % 4. - current_link_beat_approx % 4. + 4.)
+    % 4
+    + current_link_beat_approx
+    - 1.; // Ensure the 1 is on the 1
 
-          state.request_beat_at_time(target_beat, link.clock_micros(), 4.);
-          link.commit_app_session_state(&state);
-          }*/
-
-        /*while let Ok(key) = rx.try_recv() {
-          match key {
-          99 => {
-        //"c"
-        return;
-        }
-        105 => {
-        keeper.change_beat_offset(1000.);
-        }
-        107 => {
-        keeper.change_beat_offset(-1000.);
-        }
-        _ => (),
-        }
-        }*/
-
-        if count % 5 == 0 {
-            step = (step + 1) % 4;
-
-            let frac = (keeper.last_beat - 1) % 4;
-
-            print!(
-                "\rRunning {} [{}] Deck {}    Pos {}  OSC Offset: {}ms     Peers:{}   BPM:{}    ",
-                CHARS[step],
-                (0..4)
-                .map(|i| {
-                    if i == frac {
-                        "."
-                    } else {
-                        " "
-                    }
-                })
-                .collect::<String>(),
-                keeper.masterdeck_index,
-                master_beat%4.,
-                keeper.offset_micros / 1000.,
-                link.num_peers(),
-                keeper.master_bpm
-            );
-
-            stdout.flush().unwrap();
-        }
-        count = (count + 1) % 120;
-
-        sleep(period);
+    state.request_beat_at_time(target_beat, link.clock_micros(), 4.);
+    link.commit_app_session_state(&state);
     }*/
+
+    /*while let Ok(key) = rx.try_recv() {
+      match key {
+      99 => {
+    //"c"
+    return;
+    }
+    105 => {
+    keeper.change_beat_offset(1000.);
+    }
+    107 => {
+    keeper.change_beat_offset(-1000.);
+    }
+    _ => (),
+    }
+    }*/
+
+    if count % 5 == 0 {
+        step = (step + 1) % 4;
+
+        let frac = (keeper.last_beat - 1) % 4;
+
+        print!(
+            "\rRunning {} [{}] Deck {}    Pos {}  OSC Offset: {}ms     Peers:{}   BPM:{}    ",
+            CHARS[step],
+            (0..4)
+            .map(|i| {
+                if i == frac {
+                    "."
+                } else {
+                    " "
+                }
+            })
+            .collect::<String>(),
+            keeper.masterdeck_index,
+            master_beat%4.,
+            keeper.offset_micros / 1000.,
+            link.num_peers(),
+            keeper.master_bpm
+        );
+
+        stdout.flush().unwrap();
+    }
+    count = (count + 1) % 120;
+
+    sleep(period);
+}*/
 }
 
 fn download_offsets() {

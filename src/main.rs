@@ -1,4 +1,4 @@
-use application::{AppToKeeperMessage, Flag, KeeperToAppMessage};
+use application::{AppToKeeperMessage, ToAppMessage};
 use iced::window::Settings;
 use iced::{Application};
 use outputmodules::{OutputModule, OutputModules};
@@ -25,15 +25,6 @@ use offsets::{Pointer, RekordboxOffsets};
 mod application;
 mod outputmodules;
 
-const VERSION: &str = env!("CARGO_PKG_VERSION");
-
-extern "C" {
-    fn _getch() -> core::ffi::c_char;
-}
-
-fn getch() -> i8 {
-    unsafe { _getch() }
-}
 
 struct Value<T> {
     address: usize,
@@ -134,12 +125,12 @@ pub struct BeatKeeper {
     last_master_bpm: f32,
     running_modules: Vec<Box<dyn OutputModule>>,
     rx: Receiver<AppToKeeperMessage>,
-    tx: Sender<KeeperToAppMessage>,
+    tx: Sender<ToAppMessage>,
     
 }
 
 impl BeatKeeper {
-    pub fn start(offsets: RekordboxOffsets, modules: Vec<(outputmodules::OutputModules, bool)>, rx: Receiver<AppToKeeperMessage>, tx: Sender<KeeperToAppMessage>){
+    pub fn start(offsets: RekordboxOffsets, modules: Vec<(outputmodules::OutputModules, bool)>, rx: Receiver<AppToKeeperMessage>, tx: Sender<ToAppMessage>){
 
         thread::spawn(move || {
             let mut running_modules = vec![];
@@ -239,7 +230,7 @@ fn main() {
     let mut osc_enabled = false;
 
     let version_offsets = RekordboxOffsets::from_file("offsets");
-    crate::application::App::run(iced::settings::Settings::default());
+    crate::application::App::run(iced::settings::Settings::default()).unwrap();
 
 
     let mut versions: Vec<String> = version_offsets.keys().map(|x| x.to_string()).collect();

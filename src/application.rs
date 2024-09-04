@@ -1,4 +1,6 @@
 use std::cell::RefCell;
+use std::path::Path;
+use std::thread;
 use rusty_link::{AblLink, SessionState};
 use crate::offsets::RekordboxOffsetCollection;
 use crate::BeatKeeper;
@@ -16,22 +18,37 @@ use std::sync::mpsc;
 
 use crate::outputmodules::OutputModules;
 
+const VERSION: &str = env!("CARGO_PKG_VERSION");
 
-pub struct Flag{
-    pub offsets: RekordboxOffsetCollection
-    
 
+#[derive(Debug, Clone)]
+pub enum ToAppMessage {
+    Beat(f32),
+    ChangedUpdateCheckState(UpdateCheckState)
 }
 
 #[derive(Debug, Clone)]
-pub enum KeeperToAppMessage {
-    Beat(f32),
+struct ProgramVersionInformation{
+    executable: (i32, i32, i32),
+    offsets: i32
+}
+
+impl ProgramVersionInformation{
+    fn from_string(s: &str) -> ProgramVersionInformation{
+        let mut parts = s.split(" ");
+        let mut exeversion = parts.next().expect("Invalid version string").split(".").map(|x| x.parse::<i32>().unwrap());
+        ProgramVersionInformation{
+            executable: (exeversion.next().unwrap(), exeversion.next().unwrap(), exeversion.next().unwrap()),
+            offsets: parts.next().unwrap().parse::<i32>().unwrap()
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
 pub enum AppToKeeperMessage {
 }
 
+#[derive(Debug, Clone)]
 enum UpdateCheckState{
     Checking,
     UpToDate,
@@ -49,8 +66,8 @@ enum AppState{
 pub struct App {
     beat: f32,
     offsets: RekordboxOffsetCollection,
-    keeper_to_app_sender: std::sync::mpsc::Sender<KeeperToAppMessage>,
-    receiver: RefCell<Option<mpsc::Receiver<KeeperToAppMessage>>>,
+    keeper_to_app_sender: std::sync::mpsc::Sender<ToAppMessage>,
+    receiver: RefCell<Option<mpsc::Receiver<ToAppMessage>>>,
     state: AppState,
     versions: Vec<String>,
     selected_version: String,
@@ -62,7 +79,7 @@ pub struct App {
 
 #[derive(Debug, Clone)]
 pub enum Msg {
-    KeeperMessage(KeeperToAppMessage),
+    KeeperMessage(ToAppMessage),
     Start,
     VersionSelected(String),
     ToggleModule(usize),
@@ -87,7 +104,21 @@ impl iced::Application for App {
 
 
 
-        let (tx, rx) = std::sync::mpsc::channel::<KeeperToAppMessage>();
+        let (tx, rx) = std::sync::mpsc::channel::<ToAppMessage>();
+
+        let txclone = tx.clone();
+        thread::spawn(move ||{
+            
+            // let res = reqwest::get("")
+
+            if !Path::new("./offsets").exists(){
+            }
+
+
+        });
+
+        
+
         (App{
             keeper_to_app_sender: tx,
             app_to_keeper_sender: None,

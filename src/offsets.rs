@@ -54,17 +54,15 @@ impl RekordboxOffsets {
         for line in contents.lines() {
             if line.is_empty() {
                 empty_line_count += 1;
-                if empty_line_count >= 2{
-                    if !lines.is_empty() {
-                        let o = RekordboxOffsets::from_lines(&lines);
-                        map.insert(o.rbversion.clone(), o);
-                        lines.clear();
-                    }
+                if empty_line_count >= 2 && !lines.is_empty() {
+                    let o = RekordboxOffsets::from_lines(&lines);
+                    map.insert(o.rbversion.clone(), o);
+                    lines.clear();
                 }
             } else {
                 empty_line_count = 0;
                 if !line.starts_with('#') {
-                lines.push(line.to_string());
+                    lines.push(line.to_string());
                 }
             }
         }

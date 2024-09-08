@@ -207,15 +207,10 @@ impl BeatKeeper {
 const CHARS: [&str; 4] = ["|", "/", "-", "\\"];
 
 fn main() {
-    println!("Rekordbox OSC v{}", VERSION);
     println!("Checking for updates...");
 
 
 
-    if !Path::new("./offsets").exists() {
-        println!("Offsets not found, downloading from repo...");
-        download_offsets();
-    }
 
     /*let (tx, rx) = channel::<i8>();
       spawn(move || loop {
@@ -229,18 +224,13 @@ fn main() {
 
     let mut osc_enabled = false;
 
-    let version_offsets = RekordboxOffsets::from_file("offsets");
     crate::application::App::run(iced::settings::Settings::default()).unwrap();
 
 
-    let mut versions: Vec<String> = version_offsets.keys().map(|x| x.to_string()).collect();
-    versions.sort();
-    versions.reverse();
-    let mut target_version = versions[0].clone();
 
     let mut args_iter = args.iter();
     args_iter.next();
-    while let Some(arg) = args_iter.next() {
+    /*while let Some(arg) = args_iter.next() {
         let mut chars = arg.chars();
         if let Some(char) = chars.next() {
             if char == '-' {
@@ -302,15 +292,8 @@ fn main() {
                 }
             }
         }
-    }
+    }*/
 
-    let offsets = if let Some(offsets) = version_offsets.get(target_version.as_str()) {
-        offsets
-    } else {
-        println!("Unsupported version! {target_version}");
-        return;
-    };
-    println!("Targeting Rekordbox version {target_version}");
 
     let socket = if osc_enabled {
         println!("Connecting from: {}", source_address);
@@ -461,23 +444,7 @@ fn main() {
 }*/
 }
 
-fn download_offsets() {
-    match Command::new("curl")
-        .args([
-            "-o",
-            "offsets",
-            "https://raw.githubusercontent.com/grufkork/rkbx_osc/master/offsets",
-        ])
-        .output()
-        {
-            Ok(output) => {
-                println!("{}", String::from_utf8(output.stdout).unwrap());
-                println!("{}", String::from_utf8(output.stderr).unwrap());
-            }
-            Err(error) => println!("{}", error),
-        }
-    println!("Done!");
-}
+
 
 
 

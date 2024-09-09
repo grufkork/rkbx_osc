@@ -1,9 +1,10 @@
 use application::{AppToKeeperMessage, ToAppMessage};
 use iced::window::Settings;
 use iced::{Application};
-use outputmodules::{OutputModule, OutputModules};
+use outputmodules::{ModuleConfig, OutputModule, OutputModules};
 use rosc::{encoder::encode, OscMessage, OscPacket, OscType};
 use rusty_link::{AblLink, SessionState};
+use std::collections::HashMap;
 use std::process::Command;
 use std::sync::mpsc::{self, Receiver, Sender};
 use std::thread;
@@ -130,8 +131,13 @@ pub struct BeatKeeper {
 }
 
 impl BeatKeeper {
-    pub fn start(offsets: RekordboxOffsets, modules: Vec<(outputmodules::OutputModules, bool)>, rx: Receiver<AppToKeeperMessage>, tx: Sender<ToAppMessage>){
+    pub fn start(offsets: RekordboxOffsets, modules: Vec<(outputmodules::OutputModules, bool)>, config: HashMap<String, ModuleConfig>, rx: Receiver<AppToKeeperMessage>, tx: Sender<ToAppMessage>){
 
+        let update_rate = if let Some(map) = config.get("keeper"){
+            map.get("update_rate").unwrap_or(&"".to_string()).parse::<u64>().unwrap_or(50)
+        }else{
+            50
+        };
         thread::spawn(move || {
             let mut running_modules = vec![];
 
@@ -140,11 +146,13 @@ impl BeatKeeper {
                     continue;
                 }
 
+                let conf = config.get(&module.to_config_name()).unwrap_or(&HashMap::new()).clone();
+
                 match module{
                     OutputModules::AbletonLink => {
-                        running_modules.push(outputmodules::abletonlink::AbletonLink::new());
+                        running_modules.push(outputmodules::abletonlink::AbletonLink::create(conf));
                     },
-                    OutputModules::OSC => {
+                    OutputModules::Osc => {
 
                     }
                 }
@@ -164,7 +172,7 @@ impl BeatKeeper {
                 running_modules,
             };
 
-            let period = Duration::from_micros(1000000 / 50); // 50Hz
+            let period = Duration::from_micros(1000000 / update_rate); // 50Hz
             loop{
                 keeper.update();
                 thread::sleep(period);
@@ -177,22 +185,33 @@ impl BeatKeeper {
         self.master_bpm = self.rb.master_bpm.read();
         self.masterdeck_index = self.rb.masterdeck_index.read() as usize;
 
-        let samplerate = self.rb.sample_rates[self.masterdeck_index].read();
-        let sample_poisition = self.rb.sample_positions[self.masterdeck_index].read();
-        let seconds_played = sample_poisition as f32 / samplerate as f32;
+        // let samplerate = self.rb.sample_rates[self.masterdeck_index].read();
+        let sample_position = self.rb.sample_positions[self.masterdeck_index].read();
+        let seconds_played = sample_position as f32 / 44100.;//samplerate as f32;
 
         let grid_shift = self.rb.beatgrid_seconds[self.masterdeck_index].read();
-        let grid_beat = self.rb.beatgrid_beats[self.masterdeck_index].read() as f32;
+        let mut grid_beat = self.rb.beatgrid_beats[self.masterdeck_index].read();
+        if grid_beat < 1{
+            grid_beat = 1;
+        }
+
         let original_bpm = self.rb.original_bpms[self.masterdeck_index].read();
         let grid_size = 60. / original_bpm;
 
-        let grid_origin = grid_shift as f32 + (grid_beat) * grid_size;
+        let grid_origin = grid_shift as f32 + grid_beat as f32 * grid_size;
 
         let beat = (seconds_played - grid_origin) / grid_size;
 
         let bpm_changed = self.master_bpm != self.last_master_bpm;
 
+        println!("beat: {}", beat);
+        println!("s played: {}", seconds_played);
+        println!("origin {}", grid_origin);
+        println!("shift: {}", grid_shift);
+        println!("grid beat: {}", grid_beat);
+
         for module in &mut self.running_modules{
+            println!("mod");
             module.beat_update(beat);
             if bpm_changed{
                 module.bpm_changed(self.master_bpm);

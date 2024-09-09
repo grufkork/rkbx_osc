@@ -69,7 +69,8 @@ pub struct App {
     keeper: Option<BeatKeeper>,
     modules: Vec<(OutputModules, bool)>,
     app_to_keeper_sender: Option<mpsc::Sender<AppToKeeperMessage>>,
-    update_check_state: UpdateCheckState
+    update_check_state: UpdateCheckState,
+    config: HashMap<String, HashMap<String, String>>
 }
 
 impl App{
@@ -102,7 +103,8 @@ impl iced::Application for App {
     type Theme = Theme;
 
     fn new(_flags: ()) -> (App, iced::Command<Msg>) {
-        let modules = [OutputModules::AbletonLink, OutputModules::OSC].iter().map(|x| (*x, false)).collect();
+        
+        let modules = [OutputModules::AbletonLink, OutputModules::Osc].iter().map(|x| (*x, false)).collect();
 
         let (tx, rx) = std::sync::mpsc::channel::<ToAppMessage>();
 
@@ -112,11 +114,13 @@ impl iced::Application for App {
                 txclone.send(ToAppMessage::ChangedUpdateCheckState(UpdateCheckState::Failed("Failed to get exe version info".to_string()))).unwrap();
                 return;
             };
+            let new_exe_version = new_exe_version.trim();
+
             println!("Current: {:?}", VERSION);
             println!("New: {:?}", new_exe_version);
 
             if new_exe_version != VERSION{
-                txclone.send(ToAppMessage::ChangedUpdateCheckState(UpdateCheckState::ExecutableUpdateAvailable(new_exe_version))).unwrap();
+                txclone.send(ToAppMessage::ChangedUpdateCheckState(UpdateCheckState::ExecutableUpdateAvailable(new_exe_version.to_string()))).unwrap();
                 return;
             }
 
@@ -125,9 +129,9 @@ impl iced::Application for App {
                 txclone.send(ToAppMessage::ChangedUpdateCheckState(UpdateCheckState::Failed("Failed to get offset version info".to_string()))).unwrap();
                 return;
             };
-            let new_offsets_version = new_offsets_version.parse::<i32>().unwrap();
+            let new_offsets_version = new_offsets_version.trim().parse::<i32>().unwrap();
 
-            if !Path::new("./version_offsets").exists() || fs::read_to_string("./version_offsets").unwrap().parse::<i32>().unwrap() < new_offsets_version {
+            if !Path::new("./version_offsets").exists() || !Path::new("./offsets").exists() || fs::read_to_string("./version_offsets").unwrap().trim().parse::<i32>().unwrap() < new_offsets_version {
                 txclone.send(ToAppMessage::ChangedUpdateCheckState(UpdateCheckState::OffsetUpdateAvailable(0))).unwrap();
                 return;
             }
@@ -136,6 +140,27 @@ impl iced::Application for App {
 
         });
 
+        let mut config = HashMap::new();
+        let config_src = fs::read_to_string("config").unwrap_or_default();
+        let config_lines = config_src.lines();
+        for line in config_lines{
+            let Some(split_index) = line.find(" ") else {continue;};
+            let path = &line[..split_index];
+            let mut split = path.split(".");
+            let component = split.next().unwrap();
+            let key = split.next().unwrap();
+
+
+            if !config.contains_key(component){
+                config.insert(component.to_string(), HashMap::new());
+            }
+
+            config.get_mut(component).unwrap().insert(key.to_string(), line[split_index+1..].to_string());
+        }
+        println!("{:?}", config);
+
+
+        
         let versions = vec!["No offset file found".to_string()];
         let mut app = App{
             keeper_to_app_sender: tx,
@@ -148,7 +173,8 @@ impl iced::Application for App {
             versions,
             keeper: None,
             modules,
-            update_check_state: UpdateCheckState::Checking
+            update_check_state: UpdateCheckState::Checking,
+            config
         };
 
         app.reload_offsets();
@@ -183,6 +209,7 @@ impl iced::Application for App {
                 BeatKeeper::start(
                     self.offsets.as_ref().unwrap().get(&self.selected_version).unwrap().clone(),
                     self.modules.clone(),
+                    self.config.clone(),
                     rx,
                     self.keeper_to_app_sender.clone());
 
@@ -233,9 +260,6 @@ impl iced::Application for App {
             }
             AppState::Idling => {
                 column!(
-                    text(format!("Beat: {}", self.beat)).size(16),
-                    
-
                         if self.offsets.is_some() {
                             button("Start").on_press(Msg::Start)
                         }else{
@@ -280,10 +304,8 @@ impl iced::Application for App {
 }
 
 fn download_offsets() -> Result<(), String> {
-    let offsets = get_file("offsets")?;
-    std::fs::write("offsets", offsets).unwrap();
-    let offsets = get_file("version")?;
-    std::fs::write("version", format!("{VERSION} {}", offsets.split(' ').nth(1).unwrap())).unwrap();
+    std::fs::write("offsets", get_file("offsets")?).unwrap();
+    std::fs::write("version_offsets", get_file("version_offsets")?).unwrap();
 
     /*match Command::new("curl")
         .args([

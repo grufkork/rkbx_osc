@@ -2,6 +2,8 @@ use rusty_link::{AblLink, SessionState};
 
 use crate::outputmodules::OutputModule;
 
+use super::ModuleConfig;
+
 
 pub struct AbletonLink{
     link: AblLink,
@@ -9,7 +11,7 @@ pub struct AbletonLink{
 }
 
 impl AbletonLink{
-    pub fn new() -> Box<dyn OutputModule>{
+    pub fn create(_conf: ModuleConfig) -> Box<dyn OutputModule>{
         let link = AblLink::new(120.);
         link.enable(false);
 
@@ -33,9 +35,9 @@ impl OutputModule for AbletonLink{
 
     fn beat_update(&mut self, beat: f32){
 
-        let target_beat = (beat as f64 + 1.) % 4.;
+        // let target_beat = (beat as f64) % 4.;
 
-        self.state.force_beat_at_time(target_beat, self.link.clock_micros() as u64, 4.);
+        self.state.force_beat_at_time(beat.into(), self.link.clock_micros() as u64, 4.);
         self.link.commit_app_session_state(&self.state);
     }
 }

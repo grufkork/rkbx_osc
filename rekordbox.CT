@@ -49,111 +49,8 @@
     <CheatEntry>
       <ID>10</ID>
       <Description>"----"</Description>
+      <LastState Value="" RealAddress="00000000"/>
       <GroupHeader>1</GroupHeader>
-    </CheatEntry>
-    <CheatEntry>
-      <ID>11</ID>
-      <Description>"Shift(s)"</Description>
-      <VariableType>Double</VariableType>
-      <Address>1F114A6B2D0</Address>
-    </CheatEntry>
-    <CheatEntry>
-      <ID>12</ID>
-      <Description>"Shift(step)"</Description>
-      <VariableType>4 Bytes</VariableType>
-      <Address>1F11D215EC8</Address>
-    </CheatEntry>
-    <CheatEntry>
-      <ID>16</ID>
-      <Description>"Samplerate"</Description>
-      <VariableType>4 Bytes</VariableType>
-      <Address>1F113C1C04C</Address>
-    </CheatEntry>
-    <CheatEntry>
-      <ID>18</ID>
-      <Description>"Sample#"</Description>
-      <ShowAsSigned>1</ShowAsSigned>
-      <VariableType>8 Bytes</VariableType>
-      <Address>1F114A6B2C0</Address>
-    </CheatEntry>
-    <CheatEntry>
-      <ID>19</ID>
-      <Description>"Shift s"</Description>
-      <VariableType>Double</VariableType>
-      <Address>"rekordbox.exe"+0444BDF8</Address>
-      <Offsets>
-        <Offset>140</Offset>
-        <Offset>238</Offset>
-        <Offset>0</Offset>
-      </Offsets>
-    </CheatEntry>
-    <CheatEntry>
-      <ID>20</ID>
-      <Description>"Shift step"</Description>
-      <VariableType>4 Bytes</VariableType>
-      <Address>"rekordbox.exe"+0443F630</Address>
-      <Offsets>
-        <Offset>238</Offset>
-        <Offset>300</Offset>
-        <Offset>860</Offset>
-      </Offsets>
-    </CheatEntry>
-    <CheatEntry>
-      <ID>21</ID>
-      <Description>"Sample#"</Description>
-      <ShowAsSigned>1</ShowAsSigned>
-      <VariableType>8 Bytes</VariableType>
-      <Address>"rekordbox.exe"+0444BDF8</Address>
-      <Offsets>
-        <Offset>130</Offset>
-        <Offset>238</Offset>
-        <Offset>0</Offset>
-      </Offsets>
-    </CheatEntry>
-    <CheatEntry>
-      <ID>23</ID>
-      <Description>"Samplerate"</Description>
-      <VariableType>4 Bytes</VariableType>
-      <Address>"rekordbox.exe"+043C6B10</Address>
-      <Offsets>
-        <Offset>39C</Offset>
-        <Offset>8</Offset>
-      </Offsets>
-    </CheatEntry>
-    <CheatEntry>
-      <ID>22</ID>
-      <Description>"No description"</Description>
-      <VariableType>4 Bytes</VariableType>
-      <Address>29C5511B3BC</Address>
-    </CheatEntry>
-    <CheatEntry>
-      <ID>24</ID>
-      <Description>"Masterdeck index"</Description>
-      <VariableType>Byte</VariableType>
-      <Address>22034CC4788</Address>
-    </CheatEntry>
-    <CheatEntry>
-      <ID>25</ID>
-      <Description>"Masterdeck BPM"</Description>
-      <VariableType>Float</VariableType>
-      <Address>2203B0A4FD0</Address>
-    </CheatEntry>
-    <CheatEntry>
-      <ID>26</ID>
-      <Description>"True BPM"</Description>
-      <VariableType>Float</VariableType>
-      <Address>22077833448</Address>
-    </CheatEntry>
-    <CheatEntry>
-      <ID>27</ID>
-      <Description>"Masterdeck Index"</Description>
-      <VariableType>Byte</VariableType>
-      <Address>"rekordbox.exe"+0442C088</Address>
-      <Offsets>
-        <Offset>1068</Offset>
-        <Offset>220</Offset>
-        <Offset>0</Offset>
-      </Offsets>
     </CheatEntry>
     <CheatEntry>
       <ID>28</ID>
@@ -168,13 +65,224 @@
       </Offsets>
     </CheatEntry>
     <CheatEntry>
-      <ID>29</ID>
-      <Description>"OG BPM"</Description>
+      <ID>27</ID>
+      <Description>"Masterdeck Index"</Description>
+      <VariableType>Byte</VariableType>
+      <Address>"rekordbox.exe"+0442C088</Address>
+      <Offsets>
+        <Offset>1068</Offset>
+        <Offset>220</Offset>
+        <Offset>0</Offset>
+      </Offsets>
+    </CheatEntry>
+    <CheatEntry>
+      <ID>39</ID>
+      <Description>"Deck 1"</Description>
+      <LastState Value="" RealAddress="00000000"/>
+      <GroupHeader>1</GroupHeader>
+      <CheatEntries>
+        <CheatEntry>
+          <ID>19</ID>
+          <Description>"Shift s"</Description>
+          <VariableType>Double</VariableType>
+          <Address>"rekordbox.exe"+0444BDF8</Address>
+          <Offsets>
+            <Offset>140</Offset>
+            <Offset>238</Offset>
+            <Offset>0</Offset>
+          </Offsets>
+        </CheatEntry>
+        <CheatEntry>
+          <ID>44</ID>
+          <Description>"OG BPM (BAD"</Description>
+          <VariableType>Float</VariableType>
+          <Address>"rekordbox.exe"+0443F630</Address>
+          <Offsets>
+            <Offset>190</Offset>
+            <Offset>18</Offset>
+            <Offset>10</Offset>
+          </Offsets>
+          <CheatEntries>
+            <CheatEntry>
+              <ID>52</ID>
+              <Description>"OG BPM"</Description>
+              <VariableType>Float</VariableType>
+              <Address>"rekordbox.exe"+0442C150</Address>
+              <Offsets>
+                <Offset>818</Offset>
+                <Offset>28</Offset>
+                <Offset>F0</Offset>
+              </Offsets>
+            </CheatEntry>
+          </CheatEntries>
+        </CheatEntry>
+        <CheatEntry>
+          <ID>48</ID>
+          <Description>"Shift step"</Description>
+          <ShowAsSigned>1</ShowAsSigned>
+          <VariableType>4 Bytes</VariableType>
+          <Address>"rekordbox.exe"+043DBDB0</Address>
+          <Offsets>
+            <Offset>238</Offset>
+            <Offset>1E8</Offset>
+            <Offset>330</Offset>
+            <Offset>20</Offset>
+          </Offsets>
+        </CheatEntry>
+        <CheatEntry>
+          <ID>21</ID>
+          <Description>"Sample#"</Description>
+          <ShowAsSigned>1</ShowAsSigned>
+          <VariableType>8 Bytes</VariableType>
+          <Address>"rekordbox.exe"+0444BDF8</Address>
+          <Offsets>
+            <Offset>130</Offset>
+            <Offset>238</Offset>
+            <Offset>0</Offset>
+          </Offsets>
+        </CheatEntry>
+        <CheatEntry>
+          <ID>23</ID>
+          <Description>"Samplerate"</Description>
+          <ShowAsSigned>1</ShowAsSigned>
+          <VariableType>4 Bytes</VariableType>
+          <Address>"rekordbox.exe"+043C6B10</Address>
+          <Offsets>
+            <Offset>39C</Offset>
+            <Offset>8</Offset>
+          </Offsets>
+        </CheatEntry>
+      </CheatEntries>
+    </CheatEntry>
+    <CheatEntry>
+      <ID>38</ID>
+      <Description>"Deck 2"</Description>
+      <LastState Value="" RealAddress="00000000"/>
+      <GroupHeader>1</GroupHeader>
+      <Address>0</Address>
+      <CheatEntries>
+        <CheatEntry>
+          <ID>53</ID>
+          <Description>"OG BPM"</Description>
+          <ShowAsSigned>0</ShowAsSigned>
+          <VariableType>Float</VariableType>
+          <Address>"rekordbox.exe"+0442C150</Address>
+          <Offsets>
+            <Offset>818</Offset>
+            <Offset>28</Offset>
+            <Offset>F8</Offset>
+          </Offsets>
+        </CheatEntry>
+        <CheatEntry>
+          <ID>46</ID>
+          <Description>"OG BPM (VAD"</Description>
+          <ShowAsSigned>0</ShowAsSigned>
+          <VariableType>Float</VariableType>
+          <Address>"rekordbox.exe"+0443F630</Address>
+          <Offsets>
+            <Offset>190</Offset>
+            <Offset>18</Offset>
+            <Offset>18</Offset>
+          </Offsets>
+        </CheatEntry>
+        <CheatEntry>
+          <ID>31</ID>
+          <Description>"Shift s"</Description>
+          <VariableType>Double</VariableType>
+          <Address>235A7AAD520</Address>
+        </CheatEntry>
+        <CheatEntry>
+          <ID>49</ID>
+          <Description>"Shift step"</Description>
+          <ShowAsSigned>0</ShowAsSigned>
+          <VariableType>4 Bytes</VariableType>
+          <Address>"rekordbox.exe"+043DBDB0</Address>
+          <Offsets>
+            <Offset>238</Offset>
+            <Offset>1E8</Offset>
+            <Offset>330</Offset>
+            <Offset>20</Offset>
+          </Offsets>
+        </CheatEntry>
+        <CheatEntry>
+          <ID>50</ID>
+          <Description>"No description"</Description>
+          <VariableType>4 Bytes</VariableType>
+          <Address>1C9A2BD4A88</Address>
+        </CheatEntry>
+        <CheatEntry>
+          <ID>32</ID>
+          <Description>"Shit Step old"</Description>
+          <VariableType>4 Bytes</VariableType>
+          <Address>235B30BE4A8</Address>
+        </CheatEntry>
+        <CheatEntry>
+          <ID>36</ID>
+          <Description>"Sample#"</Description>
+          <ShowAsSigned>1</ShowAsSigned>
+          <VariableType>8 Bytes</VariableType>
+          <Address>235A7AAD510</Address>
+        </CheatEntry>
+        <CheatEntry>
+          <ID>37</ID>
+          <Description>"Samplerate"</Description>
+          <VariableType>4 Bytes</VariableType>
+          <Address>235F27A53BC</Address>
+        </CheatEntry>
+      </CheatEntries>
+    </CheatEntry>
+    <CheatEntry>
+      <ID>41</ID>
+      <Description>"pointerscan result"</Description>
       <VariableType>Float</VariableType>
+      <Address>"rekordbox.exe"+043C6B10</Address>
+      <Offsets>
+        <Offset>39C</Offset>
+        <Offset>10</Offset>
+      </Offsets>
+    </CheatEntry>
+    <CheatEntry>
+      <ID>20</ID>
+      <Description>"Shift step OLD"</Description>
+      <ShowAsSigned>1</ShowAsSigned>
+      <VariableType>4 Bytes</VariableType>
       <Address>"rekordbox.exe"+0443F630</Address>
       <Offsets>
-        <Offset>1C0</Offset>
-        <Offset>110</Offset>
+        <Offset>238</Offset>
+        <Offset>300</Offset>
+        <Offset>860</Offset>
+      </Offsets>
+    </CheatEntry>
+    <CheatEntry>
+      <ID>71</ID>
+      <Description>"Deck 1"</Description>
+      <ShowAsSigned>0</ShowAsSigned>
+      <VariableType>String</VariableType>
+      <Length>100</Length>
+      <Unicode>0</Unicode>
+      <CodePage>0</CodePage>
+      <ZeroTerminate>1</ZeroTerminate>
+      <Address>"rekordbox.exe"+0443F630</Address>
+      <Offsets>
+        <Offset>0</Offset>
+        <Offset>E0</Offset>
+        <Offset>830</Offset>
+      </Offsets>
+    </CheatEntry>
+    <CheatEntry>
+      <ID>74</ID>
+      <Description>"pointerscan result"</Description>
+      <ShowAsSigned>0</ShowAsSigned>
+      <VariableType>String</VariableType>
+      <Length>100</Length>
+      <Unicode>0</Unicode>
+      <CodePage>0</CodePage>
+      <ZeroTerminate>1</ZeroTerminate>
+      <Address>"rekordbox.exe"+0443F630</Address>
+      <Offsets>
+        <Offset>0</Offset>
+        <Offset>E0</Offset>
+        <Offset>838</Offset>
       </Offsets>
     </CheatEntry>
   </CheatEntries>

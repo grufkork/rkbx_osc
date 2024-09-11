@@ -4,29 +4,31 @@ use std::{collections::HashMap, fs::File, io::Read};
 pub type RekordboxOffsetCollection = HashMap<String, RekordboxOffsets>;
 
 impl RekordboxOffsets {
-    pub fn from_lines(lines: &[String]) -> RekordboxOffsets {
+    pub fn from_lines(lines: &[String]) -> Option<RekordboxOffsets> {
         let mut rows = lines.iter().peekable();
 
-        let rb_version = rows.next().unwrap().to_string();
+        let rb_version = rows.next()?.to_string();
 
-        let master_bpm = Pointer::from_string(rows.next().unwrap());
-        let masterdeck_index = Pointer::from_string(rows.next().unwrap());
+        let master_bpm = Pointer::from_string(rows.next()?);
+        let masterdeck_index = Pointer::from_string(rows.next()?);
 
         let mut beatgrid_shift = vec![];
         let mut beatgrid_beat = vec![];
         let mut sample_position = vec![];
         let mut sample_rate = vec![];
         let mut original_bpm = vec![];
+        let mut track_info = vec![];
 
-        while rows.peek().is_some(){
-            original_bpm.push(Pointer::from_string(rows.next().unwrap()));
-            beatgrid_shift.push(Pointer::from_string(rows.next().unwrap()));
-            beatgrid_beat.push(Pointer::from_string(rows.next().unwrap()));
-            sample_position.push(Pointer::from_string(rows.next().unwrap()));
-            sample_rate.push(Pointer::from_string(rows.next().unwrap()));
+        while rows.peek().is_some() {
+            original_bpm.push(Pointer::from_string(rows.next()?));
+            beatgrid_shift.push(Pointer::from_string(rows.next()?));
+            beatgrid_beat.push(Pointer::from_string(rows.next()?));
+            sample_position.push(Pointer::from_string(rows.next()?));
+            sample_rate.push(Pointer::from_string(rows.next()?));
+            track_info.push(Pointer::from_string(rows.next()?));
         }
 
-        RekordboxOffsets {
+        Some(RekordboxOffsets {
             rbversion: rb_version,
             beatgrid_shift,
             beatgrid_beat,
@@ -35,15 +37,18 @@ impl RekordboxOffsets {
             original_bpm,
             master_bpm,
             masterdeck_index,
-        }
-
-
+            track_info,
+        })
     }
 
-    pub fn from_file(name: &str) -> HashMap<String, RekordboxOffsets> {
-        let mut file = File::open(name).unwrap();
+    pub fn from_file(name: &str) -> Result<HashMap<String, RekordboxOffsets>, String> {
+        let Ok(mut file) = File::open(name) else {
+            return Err(format!("Could not open offset file {name}"));
+        };
         let mut contents = String::new();
-        file.read_to_string(&mut contents).unwrap();
+        if file.read_to_string(&mut contents).is_err() {
+            return Err(format!("Could not read offset file {name}"));
+        }
         drop(file);
 
         let mut empty_line_count = 0;
@@ -55,8 +60,11 @@ impl RekordboxOffsets {
             if line.is_empty() {
                 empty_line_count += 1;
                 if empty_line_count >= 2 && !lines.is_empty() {
-                    let o = RekordboxOffsets::from_lines(&lines);
-                    map.insert(o.rbversion.clone(), o);
+                    if let Some(offsets) = RekordboxOffsets::from_lines(&lines) {
+                        map.insert(offsets.rbversion.clone(), offsets);
+                    } else {
+                        println!("Failed to parse offsets: {lines:?}");
+                    }
                     lines.clear();
                 }
             } else {
@@ -67,7 +75,7 @@ impl RekordboxOffsets {
             }
         }
 
-        map
+        Ok(map)
     }
 }
 
@@ -81,6 +89,7 @@ pub struct RekordboxOffsets {
     pub sample_position: Vec<Pointer>,
     pub sample_rate: Vec<Pointer>,
     pub original_bpm: Vec<Pointer>,
+    pub track_info: Vec<Pointer>,
 }
 
 #[derive(Clone, Debug)]
@@ -106,7 +115,7 @@ impl Pointer {
 impl fmt::Display for Pointer {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let mut res = "[".to_string();
-        for offset in &self.offsets{
+        for offset in &self.offsets {
             res += &format!("{offset:X}, ");
         }
         res += &format!("{:X}]", self.final_offset);

@@ -4,14 +4,13 @@ use crate::outputmodules::OutputModule;
 
 use super::ModuleConfig;
 
-
-pub struct AbletonLink{
+pub struct AbletonLink {
     link: AblLink,
-    state: SessionState
+    state: SessionState,
 }
 
-impl AbletonLink{
-    pub fn create(_conf: ModuleConfig) -> Box<dyn OutputModule>{
+impl AbletonLink {
+    pub fn create(_conf: ModuleConfig) -> Box<dyn OutputModule> {
         let link = AblLink::new(120.);
         link.enable(false);
 
@@ -20,24 +19,21 @@ impl AbletonLink{
 
         link.enable(true);
 
-        Box::new(AbletonLink{
-            link,
-            state
-        })
+        Box::new(AbletonLink { link, state })
     }
 }
 
-impl OutputModule for AbletonLink{
-    fn bpm_changed(&mut self, bpm: f32){
+impl OutputModule for AbletonLink {
+    fn bpm_changed(&mut self, bpm: f32) {
         self.state.set_tempo(bpm as f64, self.link.clock_micros());
         self.link.commit_app_session_state(&self.state);
     }
 
-    fn beat_update(&mut self, beat: f32){
-
+    fn beat_update(&mut self, beat: f32) {
         // let target_beat = (beat as f64) % 4.;
 
-        self.state.force_beat_at_time(beat.into(), self.link.clock_micros() as u64, 4.);
+        self.state
+            .force_beat_at_time(beat.into(), self.link.clock_micros() as u64, 4.);
         self.link.commit_app_session_state(&self.state);
     }
 }

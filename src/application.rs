@@ -3,12 +3,17 @@ use crate::catch_panic::ErrorInfo;
 use crate::offsets::RekordboxOffsetCollection;
 use crate::BeatKeeper;
 use crate::RekordboxOffsets;
+use iced::alignment::Horizontal;
+use iced::application::StyleSheet;
+use iced::theme::Palette;
+use iced::widget::container;
 use rusty_link::{AblLink, SessionState};
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
 use std::process::Command;
+use std::sync::Arc;
 use std::thread;
 
 use iced::subscription;
@@ -279,7 +284,6 @@ impl iced::Application for App {
                     self.config.clone(),
                     rx,
                     self.keeper_to_app_sender.clone(),
-                    self.error_tx.clone(),
                 );
             }
             Msg::VersionSelected(version) => {
@@ -313,18 +317,43 @@ impl iced::Application for App {
         })
     }
 
+    fn theme(&self) -> Self::Theme {
+        iced::Theme::GruvboxDark
+        /*iced::Theme::Custom(Arc::new(
+                iced::theme::Custom::new(String::from("BlackOrange"), Palette{ // Custom::with_fn eventually
+                    background: iced::Color::from_rgb(0.1, 0.1, 0.1),
+                    primary: iced::Color::from_rgb(1., 0.5, 0.),
+                    text: iced::Color::from_rgb(0.8, 0.8, 0.8),
+                    success: iced::Color::from_rgb(0.1, 0.8, 0.1),
+                    danger: iced::Color::from_rgb(1.0, 0.1, 0.1),
+                })
+        ))*/
+    }
+
     fn view(&self) -> Element<Msg> {
         println!("View uodate");
+        
+        let monospaced = iced::Font{
+            family: iced::font::Family::Monospace,
+            ..Default::default()
+        };
+
+
         column([match self.state {
             AppState::Running => text("Link started").into(),
             AppState::Idling => {
                 column!(
+                    row!(
+                        pick_list(self.versions.clone(), Some(self.selected_version.clone()), Msg::VersionSelected),
+                        iced::widget::space::Space::with_width(10),
                         if self.offsets.is_some() {
-                            button("Start").on_press(Msg::Start)
+                            button(text("Start").horizontal_alignment(iced::alignment::Horizontal::Center)).on_press(Msg::Start)
                         }else{
-                            button("No offsets downloaded!")
-                        }.width(100),
-                    pick_list(self.versions.clone(), Some(self.selected_version.clone()), Msg::VersionSelected),
+                            button("No version selected")
+                        }.width(100)
+                    ),
+                    iced::widget::space::Space::with_height(6),
+                    text("Modules").size(20),
                     column(self.modules.iter().enumerate().map(|(i, (module, enabled))| {
                         row([
                             Checkbox::new("", *enabled).on_toggle(move |_|  {Msg::ToggleModule(i)}).into(),
@@ -333,6 +362,7 @@ impl iced::Application for App {
                             text(format!("{}", module)).into()
                         ]).into()
                     })),
+                    iced::widget::space::Space::with_height(10),
                     row({
                         let mut content = vec![
                             text(
@@ -340,7 +370,7 @@ impl iced::Application for App {
                                     UpdateCheckState::Checking => "Checking for updates...".to_string(),
                                     UpdateCheckState::UpToDate => "Up to date!".to_string(),
                                     UpdateCheckState::OffsetUpdateAvailable(version) => format!("Offset update available: v{}", version.clone()),
-                                    UpdateCheckState::ExecutableUpdateAvailable(version) => format!("Executable update available: v{}. Download the latest version from https://github.com/grufkork/rkbx_osc to update memory offsets", version.clone()),
+                                    UpdateCheckState::ExecutableUpdateAvailable(version) => format!("Executable update available: v{}.\nDownload the latest version from https://github.com/grufkork/rkbx_osc to get the latest memory offsets!", version.clone()),
                                     UpdateCheckState::Failed(e) => format!("Update failed: {e}").to_string()
                                 }).into()
                         ];
@@ -351,15 +381,17 @@ impl iced::Application for App {
 
                         content
                     }),
-                    text(format!("Version: {}", VERSION))
                 ).into()
             }
             AppState::UpdatingOffsets => text("Updating offsets").into(),
         },
-        text(self.log.join("\n")).size(20).into()
-        ]).into()
+        iced::widget::rule::Rule::horizontal(2).into(),
+        iced::widget::text(self.log.join("\n")).style(iced::Color::from_rgb(1., 0., 0.)).size(20).into(),
+        container(text(format!("rkbx_link v{}", VERSION)).font(monospaced).size(10)).center_x().width(1000).into()
+        ]).padding(iced::Padding::from(10)).into()
     }
 }
+
 
 fn download_offsets() -> Result<(), String> {
     std::fs::write("offsets", get_file("offsets")?).unwrap();

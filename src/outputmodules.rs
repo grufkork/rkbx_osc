@@ -2,6 +2,8 @@ use rusty_link::{AblLink, SessionState};
 use std::collections::HashMap;
 use std::fmt::Display;
 
+use crate::TrackInfo;
+
 pub mod abletonlink;
 pub mod osc;
 
@@ -35,6 +37,9 @@ impl Display for OutputModules {
     }
 }
 pub trait OutputModule {
-    fn bpm_changed(&mut self, bpm: f32) {}
-    fn beat_update(&mut self, beat: f32) {}
+    fn bpm_changed(&mut self, _bpm: f32) {}
+    fn beat_update(&mut self, _beat: f32) {}
+
+    fn track_changed(&mut self, _track: TrackInfo, _deck: usize) {}
+    fn master_track_changed(&mut self, _track: TrackInfo) {}
 }

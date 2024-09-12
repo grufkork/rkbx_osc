@@ -17,6 +17,15 @@ impl Osc {
         let packet = encode(&msg).unwrap();
         self.socket.send(&packet).unwrap();
     }
+
+    fn send_string(&mut self, addr: &str, value: &str) {
+        let msg = OscPacket::Message(OscMessage {
+            addr: addr.to_string(),
+            args: vec![rosc::OscType::String(value.to_string())],
+        });
+        let packet = encode(&msg).unwrap();
+        self.socket.send(&packet).unwrap();
+    }
 }
 
 impl Osc {
@@ -33,7 +42,7 @@ impl Osc {
             )
             .unwrap();
 
-        Box::new(Osc { socket: socket })
+        Box::new(Osc { socket })
     }
 }
 
@@ -45,5 +54,17 @@ impl OutputModule for Osc {
     fn beat_update(&mut self, beat: f32) {
         self.send_float("/beat/total", beat);
         self.send_float("/beat/fraction", beat % 1.);
+    }
+
+    fn track_changed(&mut self, track: crate::TrackInfo, deck: usize) {
+        self.send_string(&format!("/track/{deck}/title"), &track.title);
+        self.send_string(&format!("/track/{deck}/artist"), &track.artist);
+        self.send_string(&format!("/track/{deck}/album"), &track.album);
+    }
+
+    fn master_track_changed(&mut self, track: crate::TrackInfo) {
+        self.send_string("/track/master/title", &track.title);
+        self.send_string("/track/master/artist", &track.artist);
+        self.send_string("/track/master/album", &track.album);
     }
 }

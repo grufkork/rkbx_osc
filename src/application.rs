@@ -7,6 +7,7 @@ use iced::alignment::Horizontal;
 use iced::application::StyleSheet;
 use iced::theme::Palette;
 use iced::widget::container;
+use iced::widget::Text;
 use rusty_link::{AblLink, SessionState};
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -33,7 +34,8 @@ const REPO: &str = "grufkork/rkbx_osc/rewrite";
 pub enum ToAppMessage {
     Beat(f32),
     ChangedUpdateCheckState(UpdateCheckState),
-    Crash(String),
+    Crash(String, String),
+    Status(String, String)
 }
 
 #[derive(Debug, Clone)]
@@ -79,6 +81,7 @@ pub struct App {
     config: HashMap<String, HashMap<String, String>>,
     error_tx: mpsc::Sender<ErrorInfo>,
     log: Vec<String>,
+    statuses: HashMap<String, String>
 }
 
 impl App {
@@ -244,6 +247,7 @@ impl iced::Application for App {
             config,
             error_tx: error_tx.clone(),
             log: vec![],
+            statuses: HashMap::new()
         };
 
         app.reload_offsets();
@@ -264,8 +268,11 @@ impl iced::Application for App {
                 ToAppMessage::ChangedUpdateCheckState(state) => {
                     self.update_check_state = state;
                 }
-                ToAppMessage::Crash(e) => {
-                    self.log.push(format!("BeatKeeper crashed: {}", e));
+                ToAppMessage::Crash(source, e) => {
+                    self.log.push(format!("{source} crashed: {}", e));
+                },
+                ToAppMessage::Status(module, status) => {
+                    self.statuses.insert(module, status);
                 }
             },
             Msg::Start => {
@@ -340,8 +347,27 @@ impl iced::Application for App {
 
 
         column([match self.state {
-            AppState::Running => text("Link started").into(),
-            AppState::Idling => {
+            AppState::Running => 
+            column!(
+                text("Rekordbox Link").size(20),
+                iced::widget::space::Space::with_height(10),
+                row!(
+                        column(
+                            self.statuses.keys().map(|x| {
+                                text(x).into()
+                            })
+                        ),
+                        iced::widget::space::Space::with_width(10),
+                        // iced::widget::vertical_rule(0),
+                        column(
+                            self.statuses.values().map(|x| {
+                                text(x).font(monospaced).into()
+                            })
+                        )
+                ),
+                iced::widget::space::Space::with_height(10),
+            ).into(),
+            AppState::Idling => 
                 column!(
                     row!(
                         pick_list(self.versions.clone(), Some(self.selected_version.clone()), Msg::VersionSelected),
@@ -381,8 +407,7 @@ impl iced::Application for App {
 
                         content
                     }),
-                ).into()
-            }
+                ).into(),
             AppState::UpdatingOffsets => text("Updating offsets").into(),
         },
         iced::widget::rule::Rule::horizontal(2).into(),

@@ -1,13 +1,12 @@
 use application::{AppToKeeperMessage, ToAppMessage};
-use catch_panic::{payload_to_string, ErrorInfo};
-use iced::Application;
+use catch_panic::payload_to_string;
+use iced::{Application, Size};
 use outputmodules::{ModuleConfig, OutputModule, OutputModules};
 use std::collections::HashMap;
 use std::os::windows::raw::HANDLE;
-use std::panic::PanicHookInfo;
 use std::sync::mpsc::{Receiver, Sender};
 use std::thread;
-use std::{env, marker::PhantomData, net::UdpSocket, time::Duration};
+use std::{marker::PhantomData, time::Duration};
 use toy_arms::external::{read, Process};
 
 mod offsets;
@@ -155,7 +154,7 @@ impl<T: std::cmp::PartialEq> ChangeTrackedValue<T> {
     fn new(value: T) -> Self {
         Self { value }
     }
-    fn write(&mut self, value: T) -> bool {
+    fn set(&mut self, value: T) -> bool {
         if self.value != value {
             println!("Val changed");
             self.value = value;
@@ -171,11 +170,13 @@ pub struct BeatKeeper {
     masterdeck_index: usize,
     offset_micros: f32,
     master_bpm: ChangeTrackedValue<f32>,
-    running_modules: Vec<Box<dyn OutputModule>>,
+    running_modules: Vec<(Box<dyn OutputModule>, OutputModules)>,
     tracks: Vec<ChangeTrackedValue<TrackInfo>>,
     rx: Receiver<AppToKeeperMessage>,
     tx: Sender<ToAppMessage>,
 }
+
+type StatusMessage = Result<Option<String>, String>;
 
 impl BeatKeeper {
     pub fn start(
@@ -193,6 +194,14 @@ impl BeatKeeper {
         } else {
             50
         };
+        let slow_update_denominator = if let Some(map) = config.get("keeper") {
+            map.get("slow_update_every_nth")
+                .unwrap_or(&"".to_string())
+                .parse::<u64>()
+                .unwrap_or(50)
+        } else {
+            1000
+        };
         let crash_tx = tx.clone();
         thread::spawn(move || {
             if let Err(e) = std::panic::catch_unwind(move || {
@@ -208,12 +217,12 @@ impl BeatKeeper {
                         .unwrap_or(&HashMap::new())
                         .clone();
 
-                    running_modules.push(match module {
+                    running_modules.push((match module {
                         OutputModules::AbletonLink => {
                             outputmodules::abletonlink::AbletonLink::create(conf)
                         }
                         OutputModules::Osc => outputmodules::osc::Osc::create(conf),
-                    });
+                    }, module));
                 }
 
                 let mut keeper = BeatKeeper {
@@ -228,20 +237,22 @@ impl BeatKeeper {
                 };
 
                 let period = Duration::from_micros(1000000 / update_rate); // 50Hz
+                let mut n = 0;
                 loop {
-                    keeper.update();
+                    keeper.update(n == 0);
+                    n = (n + 1) % slow_update_denominator;
                     thread::sleep(period);
                 }
             }) {
                 crash_tx
-                    .send(ToAppMessage::Crash(payload_to_string(&e)))
+                    .send(ToAppMessage::Crash("Beatkeeper".to_string(), payload_to_string(&e)))
                     .unwrap();
                 }
         });
     }
 
-    pub fn update(&mut self) -> f32 {
-        let bpm_changed = self.master_bpm.write(self.rb.master_bpm.read());
+    pub fn update(&mut self, slow_update: bool) -> f32 {
+        let bpm_changed = self.master_bpm.set(self.rb.master_bpm.read());
         self.masterdeck_index = self.rb.masterdeck_index.read() as usize;
         if self.masterdeck_index >= self.rb.deckcount {
             self.masterdeck_index = 0;
@@ -265,31 +276,36 @@ impl BeatKeeper {
         let beat = (seconds_played - grid_origin) / grid_size;
 
 
-        println!("beat: {}", beat);
-        println!("s played: {}", seconds_played);
-        println!("origin {}", grid_origin);
-        println!("shift: {}", grid_shift);
-        println!("grid beat: {}", grid_beat);
+        // println!("beat: {}", beat);
+        // println!("s played: {}", seconds_played);
+        // println!("origin {}", grid_origin);
+        // println!("shift: {}", grid_shift);
+        // println!("grid beat: {}", grid_beat);
 
         for module in &mut self.running_modules {
-            println!("mod");
-            module.beat_update(beat);
+            module.0.beat_update(beat);
             if bpm_changed {
-                module.bpm_changed(self.master_bpm.value);
+                module.0.bpm_changed(self.master_bpm.value);
             }
         }
         for (i, track) in self.get_track_infos().iter().enumerate(){
-            if self.tracks[i].write(track.clone()){
+            if self.tracks[i].set(track.clone()){
                 for module in &mut self.running_modules {
-                    module.track_changed(track.clone(), i);
+                    module.0.track_changed(track.clone(), i);
                 }
                 if self.masterdeck_index == i {
                     for module in &mut self.running_modules {
-                        module.master_track_changed(track.clone());
+                        module.0.master_track_changed(track.clone());
                     }
                 }
             }
+        }
 
+        if slow_update{
+            let a = self.running_modules.iter_mut().map(|m| (m.1, m.0.slow_update())).collect::<Vec<(OutputModules, Result<Option<String>, String>)>>();
+            for (module, res) in a{
+                self.handle_response(module, res);
+            }
         }
 
         beat
@@ -316,6 +332,19 @@ impl BeatKeeper {
             })
         .collect()
     }
+
+    fn handle_response(&mut self, module: OutputModules, res: Result<Option<String>, String>){
+        match res{
+            Ok(msg) => {
+                if let Some(msg) = msg{
+                    self.tx.send(ToAppMessage::Status(module.to_string(), msg)).unwrap();
+                } 
+            },
+            Err(err) => {
+                self.tx.send(ToAppMessage::Crash(module.to_string(), err)).unwrap();
+            }
+        }
+    }
 }
 
 const CHARS: [&str; 4] = ["|", "/", "-", "\\"];
@@ -323,7 +352,11 @@ const CHARS: [&str; 4] = ["|", "/", "-", "\\"];
 fn main() {
     let error_tx = catch_panic::start_panic_listener();
 
-    crate::application::App::run(iced::settings::Settings::with_flags(error_tx)).unwrap();
+    let mut settings = iced::settings::Settings::with_flags(error_tx);
+    settings.window.size = Size::new(600., 150.);
+
+
+    crate::application::App::run(settings).unwrap();
 }
 
-// !cargo r -- -v 6.8.5
+// !cargo r

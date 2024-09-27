@@ -1,11 +1,13 @@
 use std::net::UdpSocket;
 
 use rosc::{encoder::encode, OscMessage, OscPacket};
+use winapi::shared::d3d9types::D3DSAMP_ADDRESSW;
 
 use super::{ModuleConfig, OutputModule};
 
 pub struct Osc {
     socket: UdpSocket,
+    info_sent: bool
 }
 
 impl Osc {
@@ -42,29 +44,51 @@ impl Osc {
             )
             .unwrap();
 
-        Box::new(Osc { socket })
+        Box::new(Osc { socket, info_sent: false })
     }
 }
 
 impl OutputModule for Osc {
-    fn bpm_changed(&mut self, bpm: f32) {
+    fn bpm_changed(&mut self, bpm: f32){
         self.send_float("/bpm", bpm);
     }
 
-    fn beat_update(&mut self, beat: f32) {
+    fn beat_update(&mut self, beat: f32){
         self.send_float("/beat/total", beat);
         self.send_float("/beat/fraction", beat % 1.);
     }
 
-    fn track_changed(&mut self, track: crate::TrackInfo, deck: usize) {
+    fn track_changed(&mut self, track: crate::TrackInfo, deck: usize){
         self.send_string(&format!("/track/{deck}/title"), &track.title);
         self.send_string(&format!("/track/{deck}/artist"), &track.artist);
         self.send_string(&format!("/track/{deck}/album"), &track.album);
     }
 
-    fn master_track_changed(&mut self, track: crate::TrackInfo) {
+    fn master_track_changed(&mut self, track: crate::TrackInfo){
         self.send_string("/track/master/title", &track.title);
         self.send_string("/track/master/artist", &track.artist);
         self.send_string("/track/master/album", &track.album);
+    }
+
+    fn slow_update(&mut self) -> Result<Option<String>, String> {
+        if !self.info_sent {
+            self.info_sent = true;
+            
+            let mut target_addr = if let Ok(addr) = self.socket.peer_addr() {
+                addr.to_string()
+            } else {
+                "No target!!".to_string()
+            };
+
+            let mut source_addr = if let Ok(addr) = self.socket.local_addr() {
+                addr.to_string()
+            } else {
+                "No source!!".to_string()
+            };
+
+
+            return Ok(Some(format!("{} -> {}", source_addr, target_addr)));
+        }
+        Ok(None)
     }
 }

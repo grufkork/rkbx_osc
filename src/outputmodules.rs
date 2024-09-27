@@ -37,9 +37,11 @@ impl Display for OutputModules {
     }
 }
 pub trait OutputModule {
-    fn bpm_changed(&mut self, _bpm: f32) {}
-    fn beat_update(&mut self, _beat: f32) {}
+    fn bpm_changed(&mut self, _bpm: f32){}
+    fn beat_update(&mut self, _beat: f32){}
 
-    fn track_changed(&mut self, _track: TrackInfo, _deck: usize) {}
-    fn master_track_changed(&mut self, _track: TrackInfo) {}
+    fn track_changed(&mut self, _track: TrackInfo, _deck: usize){}
+    fn master_track_changed(&mut self, _track: TrackInfo){}
+
+    fn slow_update(&mut self) -> Result<Option<String>, String> {Ok(None)}
 }

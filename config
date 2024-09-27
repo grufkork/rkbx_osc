@@ -1,5 +1,5 @@
-keeper.update_rate 5
-keeper.slow_update_every_nth 5
+keeper.update_rate 10
+keeper.slow_update_every_nth 10
 
 osc.destination 127.0.0.1:4460
 

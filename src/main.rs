@@ -28,7 +28,7 @@ impl<T> Value<T> {
 
         for offset in &offsets.offsets {
             address = read::<usize>(h, address + offset)
-                .expect(&format!("\nMemory read failed, check your Rekordbox version! Try updating with -u.\nIf nothing works, wait for an update or send this entire error message to @grufkork. \n\nBase: {base:X}, Offsets: {offsets}"));
+                .unwrap_or_else(|_| panic!("\nMemory read failed, check your Rekordbox version! Try updating with -u.\nIf nothing works, wait for an update or send this entire error message to @grufkork. \n\nBase: {base:X}, Offsets: {offsets}"));
         }
         address += offsets.final_offset;
 

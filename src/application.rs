@@ -80,7 +80,7 @@ pub struct App {
     update_check_state: UpdateCheckState,
     config: HashMap<String, HashMap<String, String>>,
     error_tx: mpsc::Sender<ErrorInfo>,
-    log: Vec<String>,
+    log: Vec<(String, String)>,
     statuses: HashMap<String, String>
 }
 
@@ -256,7 +256,7 @@ impl iced::Application for App {
     }
 
     fn title(&self) -> String {
-        String::from("rkbxosc")
+        String::from("Rekordbox Link")
     }
 
     fn update(&mut self, message: Msg) -> iced::Command<Msg> {
@@ -268,8 +268,8 @@ impl iced::Application for App {
                 ToAppMessage::ChangedUpdateCheckState(state) => {
                     self.update_check_state = state;
                 }
-                ToAppMessage::Crash(source, e) => {
-                    self.log.push(format!("{source} crashed: {}", e));
+                ToAppMessage::Crash(source, msg) => {
+                    self.log.push((format!("{source} crashed:"), msg));
                 },
                 ToAppMessage::Status(module, status) => {
                     self.statuses.insert(module, status);
@@ -411,7 +411,13 @@ impl iced::Application for App {
             AppState::UpdatingOffsets => text("Updating offsets").into(),
         },
         iced::widget::rule::Rule::horizontal(2).into(),
-        iced::widget::text(self.log.join("\n")).style(iced::Color::from_rgb(1., 0., 0.)).size(20).into(),
+        column(self.log.iter().map(|(source, message)| {
+            row([
+                text(source).style(iced::Color::from_rgb(1., 0., 0.)).into(),
+                text(message).font(monospaced).size(14).into()
+            ]).into()
+        })).into(),
+        // iced::widget::text(self.log.join("\n")).style(iced::Color::from_rgb(1., 0., 0.)).size(20).into(),
         container(text(format!("rkbx_link v{}", VERSION)).font(monospaced).size(10)).center_x().width(1000).into()
         ]).padding(iced::Padding::from(10)).into()
     }

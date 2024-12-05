@@ -35,6 +35,7 @@ pub enum ToAppMessage {
     Beat(f32),
     ChangedUpdateCheckState(UpdateCheckState),
     Crash(String, String),
+    Log(String, String),
     Status(String, String)
 }
 
@@ -147,9 +148,13 @@ impl iced::Application for App {
                         UpdateCheckState::Failed("Failed to get exe version info".to_string()),
                     ))
                     .unwrap();
+                    txclone.send(ToAppMessage::Log("Updater".to_string(),"Failed to check for update".to_string())).unwrap();
                 return;
             };
             let new_exe_version = new_exe_version.trim();
+
+            txclone.send(ToAppMessage::Log("Updater".to_string(), format!("Program version {:?}", VERSION))).unwrap();
+            txclone.send(ToAppMessage::Log("Updater".to_string(), format!("New version     {:?}", new_exe_version))).unwrap();
 
             println!("Current: {:?}", VERSION);
             println!("New: {:?}", new_exe_version);
@@ -160,6 +165,7 @@ impl iced::Application for App {
                         UpdateCheckState::ExecutableUpdateAvailable(new_exe_version.to_string()),
                     ))
                     .unwrap();
+                txclone.send(ToAppMessage::Log("Updater".to_string(),"New program version available!".to_string())).unwrap();
                 return;
             }
 
@@ -169,6 +175,7 @@ impl iced::Application for App {
                         UpdateCheckState::Failed("Failed to get offset version info".to_string()),
                     ))
                     .unwrap();
+                    txclone.send(ToAppMessage::Log("Updater".to_string(),"Failed to check for offset update".to_string())).unwrap();
                 return;
             };
             let Ok(new_offsets_version) = new_offsets_version.trim().parse::<i32>() else {
@@ -177,6 +184,7 @@ impl iced::Application for App {
                         UpdateCheckState::Failed("Failed to parse offset version info".to_string()),
                     ))
                     .unwrap();
+                    txclone.send(ToAppMessage::Log("Updater".to_string(),"Failed to parse update info".to_string())).unwrap();
                 return;
             };
 
@@ -194,6 +202,7 @@ impl iced::Application for App {
                         UpdateCheckState::OffsetUpdateAvailable(0),
                     ))
                     .unwrap();
+                txclone.send(ToAppMessage::Log("Updater".to_string(),format!("Offset update available! v{new_offsets_version}"))).unwrap();
                 return;
             }
 
@@ -269,7 +278,10 @@ impl iced::Application for App {
                     self.update_check_state = state;
                 }
                 ToAppMessage::Crash(source, msg) => {
-                    self.log.push((format!("{source} crashed:"), msg));
+                    self.log.push((format!("{source} crashed"), msg));
+                },
+                ToAppMessage::Log(source, msg) => {
+                    self.log.push((source, msg));
                 },
                 ToAppMessage::Status(module, status) => {
                     self.statuses.insert(module, status);
@@ -300,14 +312,17 @@ impl iced::Application for App {
                 self.modules[idx].1 = !self.modules[idx].1;
             }
             Msg::UpdateOffsets => {
+                self.keeper_to_app_sender.send(ToAppMessage::Log("Updater".to_string(),"Updating offsets...".to_string())).unwrap();
                 self.state = AppState::UpdatingOffsets;
                 match download_offsets() {
                     Ok(_) => {
                         self.reload_offsets().unwrap();
                         self.update_check_state = UpdateCheckState::UpToDate;
+                        self.keeper_to_app_sender.send(ToAppMessage::Log("Updater".to_string(),"Offsets updated".to_string())).unwrap();
                     }
                     Err(e) => {
                         println!("Error: {}", e);
+                        self.keeper_to_app_sender.send(ToAppMessage::Log("Updater".to_string(), format!("Offset update error: {e}"))).unwrap();
                         self.update_check_state = UpdateCheckState::Failed(e);
                     }
                 }
@@ -395,7 +410,7 @@ impl iced::Application for App {
                                 match &self.update_check_state{
                                     UpdateCheckState::Checking => "Checking for updates...".to_string(),
                                     UpdateCheckState::UpToDate => "Up to date!".to_string(),
-                                    UpdateCheckState::OffsetUpdateAvailable(version) => format!("Offset update available: v{}", version.clone()),
+                                    UpdateCheckState::OffsetUpdateAvailable(version) => format!("Offset update available: v{}  ", version.clone()),
                                     UpdateCheckState::ExecutableUpdateAvailable(version) => format!("Executable update available: v{}.\nDownload the latest version from https://github.com/grufkork/rkbx_osc to get the latest memory offsets!", version.clone()),
                                     UpdateCheckState::Failed(e) => format!("Update failed: {e}").to_string()
                                 }).into()
@@ -411,12 +426,13 @@ impl iced::Application for App {
             AppState::UpdatingOffsets => text("Updating offsets").into(),
         },
         iced::widget::rule::Rule::horizontal(2).into(),
-        column(self.log.iter().map(|(source, message)| {
-            row([
-                text(source).style(iced::Color::from_rgb(1., 0., 0.)).into(),
-                text(message).font(monospaced).size(14).into()
-            ]).into()
-        })).into(),
+        // column(self.log.iter().map(|(source, message)| {
+        //     row([
+        //         text(source).style(iced::Color::from_rgb(1., 0., 0.)).into(),
+        //         text(message).font(monospaced).size(14).into()
+        //     ]).into()
+        // })).into(),
+        iced::widget::scrollable(text(self.log.iter().map(|(a,b)| a.to_string() + ": " + b).fold(String::new(), |a, b| a + "\n" + &b)).font(monospaced).size(14)).width(500).height(200).into(),
         // iced::widget::text(self.log.join("\n")).style(iced::Color::from_rgb(1., 0., 0.)).size(20).into(),
         container(text(format!("rkbx_link v{}", VERSION)).font(monospaced).size(10)).center_x().width(1000).into()
         ]).padding(iced::Padding::from(10)).into()

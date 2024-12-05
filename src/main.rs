@@ -353,7 +353,7 @@ fn main() {
     let error_tx = catch_panic::start_panic_listener();
 
     let mut settings = iced::settings::Settings::with_flags(error_tx);
-    settings.window.size = Size::new(600., 150.);
+    settings.window.size = Size::new(600., 400.);
 
 
     crate::application::App::run(settings).unwrap();

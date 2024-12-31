@@ -1,5 +1,13 @@
+app.auto_update true
+app.debug false
+app.repo grufkork/rekordbox_osc/rewrite
+
+keeper.rekordbox_version 6.8.5
 keeper.update_rate 10
 keeper.slow_update_every_nth 10
 
+osc.enabled true
+osc.source 127.0.0.1:4450
 osc.destination 127.0.0.1:4460
 
+link.enabled true

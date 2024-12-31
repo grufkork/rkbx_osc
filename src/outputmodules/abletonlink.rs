@@ -1,18 +1,17 @@
-use iced::Error;
 use rusty_link::{AblLink, SessionState};
 
-use crate::outputmodules::OutputModule;
+use crate::{config::Config, log::ScopedLogger, outputmodules::OutputModule};
 
-use super::ModuleConfig;
 
 pub struct AbletonLink {
     link: AblLink,
     state: SessionState,
-    last_num_links: u64
+    last_num_links: u64,
+    logger: ScopedLogger
 }
 
 impl AbletonLink {
-    pub fn create(_conf: ModuleConfig) -> Box<dyn OutputModule> {
+    pub fn create(_conf: Config, logger: ScopedLogger) -> Box<dyn OutputModule> {
         let link = AblLink::new(120.);
         link.enable(false);
 
@@ -21,7 +20,7 @@ impl AbletonLink {
 
         link.enable(true);
 
-        Box::new(AbletonLink { link, state, last_num_links: 9999})
+        Box::new(AbletonLink { link, state, last_num_links: 9999, logger})
     }
 }
 
@@ -39,13 +38,22 @@ impl OutputModule for AbletonLink {
         self.link.commit_app_session_state(&self.state);
     }
 
-    fn slow_update(&mut self) -> Result<Option<String>, String> {
+    fn slow_update(&mut self) {
         let num_links = self.link.num_peers();
         if num_links != self.last_num_links {
             self.last_num_links = num_links;
-            Ok(Some(format!("{} peers", num_links)))
-        } else {
-            Ok(None)
+            self.logger.info(&format!("Link peers: {}", num_links));
         }
+    } 
+
+    fn get_name(&self) -> String {
+        "link".to_string()
+    }
+
+    fn get_pretty_name(&self) -> String {
+        "Ableton Link".to_string()
     }
 }
+
+
+

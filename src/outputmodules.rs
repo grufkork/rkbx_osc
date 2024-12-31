@@ -2,12 +2,12 @@ use rusty_link::{AblLink, SessionState};
 use std::collections::HashMap;
 use std::fmt::Display;
 
-use crate::TrackInfo;
+use crate::config::Config;
+use crate::beatkeeper::TrackInfo;
+use crate::log::ScopedLogger;
 
 pub mod abletonlink;
 pub mod osc;
-
-pub type ModuleConfig = HashMap<String, String>;
 
 #[derive(Clone, Copy)]
 pub enum OutputModules {
@@ -43,5 +43,25 @@ pub trait OutputModule {
     fn track_changed(&mut self, _track: TrackInfo, _deck: usize){}
     fn master_track_changed(&mut self, _track: TrackInfo){}
 
-    fn slow_update(&mut self) -> Result<Option<String>, String> {Ok(None)}
+    fn slow_update(&mut self);
+
+    fn get_name(&self) -> String;
+    fn get_pretty_name(&self) -> String;
+}
+
+
+pub struct ModuleDefinition{
+    pub config_name: String,
+    pub pretty_name: String,
+    pub create: fn(Config, ScopedLogger) -> Box<dyn OutputModule>
+}
+
+impl ModuleDefinition{
+    pub fn new(confname: &str, prettyname: &str, create: fn(Config, ScopedLogger) -> Box<dyn OutputModule>) -> Self{
+        ModuleDefinition{
+            config_name: confname.to_string(), 
+            pretty_name: prettyname.to_string(),
+            create
+        }
+    }
 }

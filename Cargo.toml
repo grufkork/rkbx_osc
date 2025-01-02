@@ -9,7 +9,7 @@ repository = "https://github.com/grufkork/rkbx_osc"
 
 [dependencies]
 # toy-arms = {version = "0.9.4", features = ["external"]}
-toy-arms = { git = "https://github.com/grufkork/toy-arms", features = ["external"] }
+toy-arms = { git = "https://github.com/grufkork/toy-arms", branch = "0.9.4", features = ["external"] }
 winapi = "0.3.9"
 rosc = "0.10.1"
 rusty_link = "0.4.2"

@@ -7,7 +7,7 @@ use crate::outputmodules::OutputModule;
 use std::{marker::PhantomData, time::Duration};
 use crate::offsets::Pointer;
 use toy_arms::external::error::TAExternalError;
-use toy_arms::external::{read, process};
+use toy_arms::external::{read, Process};
 use std::mem::size_of_val;
 use crate::RekordboxOffsets;
 
@@ -17,7 +17,6 @@ struct ReadError {
     address: usize,
     error: TAExternalError,
 }
-
 struct Value<T> {
     address: usize,
     handle: HANDLE,
@@ -29,10 +28,7 @@ impl<T> Value<T> {
         let mut address = base;
 
         for offset in &offsets.offsets {
-            println!("offset: {:X}", offset);
-            println!("address: {:X}", address);
-            println!("next: {:X}", address + offset);
-            match read::<usize>(&h, address + offset, size_of_val(offset), *offset as *mut usize){
+            address = match read::<usize>(h, address + offset){
                 Ok(val) => val,
                 Err(e) => return Err(ReadError{pointer: Some(offsets.clone()), address: address+offset, error: e}),
             }
@@ -54,13 +50,10 @@ impl<T> Value<T> {
     }
 
     fn read(&self) -> Result<T, ReadError> {
-        let mut val: T = unsafe { std::mem::zeroed::<T>() };
-        match read::<T>(&self.handle, self.address, size_of_val(&val), &mut val as *mut T){
-            Ok(()) => (),
-            Err(e) => {return Err(ReadError{pointer: None, address:self.address, error: e});},
+        match read::<T>(self.handle, self.address){
+            Ok(val) => Ok(val),
+            Err(e) => Err(ReadError{pointer: None, address:self.address, error: e}),
         }
-
-        Ok(val)
     }
 }
 
@@ -111,20 +104,17 @@ pub struct Rekordbox {
 
 impl Rekordbox {
     fn new(offsets: RekordboxOffsets) -> Result<Self, ReadError> {
-        let rb = match process::Process::from_process_name("rekordbox.exe"){
+        let rb = match Process::from_process_name("rekordbox.exe"){
             Ok(p) => p,
             Err(e) => return Err(ReadError{pointer: None, address: 0, error: e}),
         };
-        let h = rb.handle;
+        let h = rb.process_handle;
 
 
         let base = match rb.get_module_base("rekordbox.exe"){
             Ok(b) => b,
             Err(e) => return Err(ReadError{pointer: None, address: 0, error: e}),
         };
-        // let base = 0x300905a4d;
-        println!("base: {:X}", base);
-        // println!("base: {:?}", rb.get_module_info("rekordbox.exe").unwrap());
 
         let master_bpm_val: Value<f32> = Value::new(h, base, &offsets.master_bpm)?;
 
@@ -197,12 +187,13 @@ impl Rekordbox {
 
 }
 
+#[derive(Debug)]
 struct TimingDataRaw{
     master_bpm: f32,
     masterdeck_index: u8,
     sample_position: i64,
-    grid_shift: f64,
-    grid_beat: i32,
+    grid_shift: f64, // seconds shifted from the beat
+    grid_beat: i32, // # of beats shifted
     original_bpm: f32,
 
 }
@@ -369,6 +360,7 @@ impl BeatKeeper {
 
     pub fn update(&mut self, rb: &Rekordbox, slow_update: bool) -> Result<(), ReadError> {
         let mut td = rb.read_timing_data()?;
+        println!("{:?}", td);
         let bpm_changed = self.master_bpm.set(td.master_bpm);
         self.masterdeck_index = td.masterdeck_index as usize;
         if self.masterdeck_index >= rb.deckcount {

@@ -45,15 +45,6 @@ impl OutputModule for AbletonLink {
             self.logger.info(&format!("Link peers: {}", num_links));
         }
     } 
-
-    fn get_name(&self) -> String {
-        "link".to_string()
-    }
-
-    fn get_pretty_name(&self) -> String {
-        "Ableton Link".to_string()
-    }
 }
-
 
 

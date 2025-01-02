@@ -737,6 +737,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "external"
+version = "0.9.5"
+source = "git+https://github.com/grufkork/toy-arms#8c406f360661111dba540c0a026e33c5eddb1ced"
+dependencies = [
+ "regex",
+ "smartstring",
+ "thiserror",
+ "toy-arms_utils",
+ "winapi",
+]
+
+[[package]]
 name = "fast-srgb8"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1492,6 +1504,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e0242819d153cba4b4b05a5a8f2a7e9bbf97b6055b2a002b395c96b5ff3c0222"
 dependencies = [
  "cfg-if",
+]
+
+[[package]]
+name = "internal"
+version = "0.9.5"
+source = "git+https://github.com/grufkork/toy-arms#8c406f360661111dba540c0a026e33c5eddb1ced"
+dependencies = [
+ "regex",
+ "smartstring",
+ "toy-arms_derive",
+ "toy-arms_utils",
+ "winapi",
 ]
 
 [[package]]
@@ -2798,6 +2822,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3c5e1a9a646d36c3599cd173a41282daf47c44583ad367b8e6837255952e5c67"
 
 [[package]]
+name = "smartstring"
+version = "0.2.10"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e714dff2b33f2321fdcd475b71cec79781a692d846f37f415fb395a1d2bcd48e"
+dependencies = [
+ "static_assertions",
+]
+
+[[package]]
 name = "smithay-client-toolkit"
 version = "0.18.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3212,23 +3245,31 @@ checksum = "8df9b6e13f2d32c91b9bd719c00d1958837bc7dec474d94952798cc8e69eeec3"
 
 [[package]]
 name = "toy-arms"
-version = "0.9.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cf06a1ec736e8d584f60739f09056b996a924b1a982ef477755594af42c9723e"
+version = "0.9.6"
+source = "git+https://github.com/grufkork/toy-arms#8c406f360661111dba540c0a026e33c5eddb1ced"
 dependencies = [
- "thiserror",
+ "external",
+ "internal",
  "toy-arms_derive",
+ "toy-arms_utils",
  "winapi",
 ]
 
 [[package]]
 name = "toy-arms_derive"
 version = "0.1.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a27243b9968c18c78af6734e3a0b68838856e77a76f1f755f557d991afecfed7"
+source = "git+https://github.com/grufkork/toy-arms#8c406f360661111dba540c0a026e33c5eddb1ced"
 dependencies = [
  "quote",
  "syn 1.0.109",
+]
+
+[[package]]
+name = "toy-arms_utils"
+version = "0.9.5"
+source = "git+https://github.com/grufkork/toy-arms#8c406f360661111dba540c0a026e33c5eddb1ced"
+dependencies = [
+ "winapi",
 ]
 
 [[package]]

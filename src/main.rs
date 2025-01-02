@@ -21,7 +21,12 @@ const CHARS: [&str; 4] = ["|", "/", "-", "\\"];
 
 fn main() {
 
+    println!();
+    println!("=====================");
     println!("Rekordbox Link v{}", VERSION);
+    println!("Repo     https://github.com/grufkork/rkbx_osc");
+    println!("Updates  [BUY/DOWNLOAD LINK HERE]");
+    println!("=====================");
     println!();
 
     let logger = Rc::new(Logger::new(true));
@@ -41,7 +46,7 @@ fn main() {
 
     let mut update = config.get_or_default("app.auto_update", true);
     if !Path::new("offsets").exists() {
-        applogger.error("No offset file found, updating...");
+        applogger.err("No offset file found, updating...");
         update = true;
     }
 
@@ -65,7 +70,7 @@ fn main() {
     let selected_version = if let Some(version) = config.get("keeper.rekordbox_version") {
         version
     }else{
-        applogger.warning("No version specified in config, using latest version");
+        applogger.warn("No version specified in config, using latest version");
         versions[0].clone()
     };
 
@@ -74,7 +79,7 @@ fn main() {
     let offset = if let Some(offset) = offsets.get(&selected_version) {
         offset
     }else{
-        applogger.error(&format!("Offsets for Rekordbox version {} not available", selected_version));
+        applogger.err(&format!("Offsets for Rekordbox version {} not available", selected_version));
         return;
     };
 
@@ -92,42 +97,35 @@ fn update_routine(logger: ScopedLogger){
     logger.info("Checking for updates...");
     // Exe update
     let Ok(new_exe_version) = get_file("version_exe") else {
-        logger.error("Failed to fetch new executable version from repository");
+        logger.err("Failed to fetch new executable version from repository");
         return;
     };
     let new_exe_version = new_exe_version.trim();
 
 
     if new_exe_version == VERSION {
-        logger.info("Program up to date");
+        logger.info(&format!("Program up to date (v{new_exe_version})"));
     } else {
-        logger.info(&format!("\n !! Executable update available: v{} !!\n", new_exe_version));
+        logger.warn(" ");
+        logger.warn(&format!("   !! Executable update available: v{} !!", new_exe_version));
+        logger.warn("Update the program to get the latest offset updates");
+        logger.warn("");
+        return;
     }
-
-    // let Ok(new_offsets_version) = get_file("version_offsets") else {
-    //     logger.error("Failed to fetch new executable version from repository");
-    //     return;
-    // };
-    // let Ok(new_offsets_version) = new_offsets_version.trim().parse::<i32>() else {
-    //     // Failed to parse new offsets version
-    //     return;
-    // };
-
-
 
     // Offset update
     let Ok(new_offset_version) = get_file("version_offsets") else {
-        logger.error("Failed to fetch new offset version from repository");
+        logger.err("Failed to fetch new offset version from repository");
         return;
     };
     let Ok(new_offset_version) = new_offset_version.trim().parse::<i32>() else {
-        logger.error(&format!("Failed to parse new offset version: {}", new_offset_version));
+        logger.err(&format!("Failed to parse new offset version: {}", new_offset_version));
         return;
     };
 
     let mut update_offsets = false;
     if !Path::new("./version_offsets").exists(){
-        logger.warning("Missing version_offsets file");
+        logger.warn("Missing version_offsets file");
         update_offsets = true;
     }
 
@@ -136,18 +134,22 @@ fn update_routine(logger: ScopedLogger){
             logger.info("Offset update available");
             update_offsets = true;
         }else{
-            logger.info("Offsets up to date");
+            logger.info(&format!("Offsets up to date (v{new_offset_version})"));
         }
     }else{
-        logger.warning("Missing offsets file");
+        logger.warn("Missing offsets file");
         update_offsets = true;
     }
 
     if update_offsets{
         // Offset update available
+        logger.info("Downloading offsets...");
         if let Ok(offsets) = get_file("offsets") {
             std::fs::write("offsets", offsets).unwrap();
             std::fs::write("version_offsets", new_offset_version.to_string()).unwrap();
+            logger.info("Offsets updated");
+        }else{
+            logger.err("Failed to fetch offsets from repository");
         }
     }
 }

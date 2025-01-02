@@ -1,13 +1,24 @@
+# Check for updates at startup
 app.auto_update true
-app.debug false
+# Show debug logs
+app.debug true
+# Where to fetch updates from
 app.repo grufkork/rekordbox_osc/rewrite
 
+# Rekordbox version to target
 keeper.rekordbox_version 6.8.5
+# How often to fetch song position in Hz
 keeper.update_rate 10
+# Every nth update, perform a slow update
 keeper.slow_update_every_nth 10
 
+
+# == Open Sound Control ==
 osc.enabled true
+# Local address to bind to
 osc.source 127.0.0.1:4450
+# Remore address to send to
 osc.destination 127.0.0.1:4460
 
+# == Ableton Link ==
 link.enabled true

@@ -4,6 +4,7 @@ use std::rc::Rc;
 #[derive(PartialEq)]
 pub enum LogLevel {
     Debug,
+    Good,
     Info,
     Warning,
     Error,
@@ -29,6 +30,7 @@ impl Logger{
 
         let format = match level{
             LogLevel::Debug => format!("{esc}34m"),
+            LogLevel::Good => format!("{esc}32m"),
             LogLevel::Info => format!("{esc}37m"),
             LogLevel::Warning => format!("{esc}33m"),
             LogLevel::Error => format!("{esc}31m"),
@@ -38,6 +40,10 @@ impl Logger{
 
     pub fn debug(&self, source: &str, message: &str){
         self.log(source, message, LogLevel::Debug);
+    }
+
+    pub fn good(&self, source: &str, message: &str){
+        self.log(source, message, LogLevel::Good);
     }
 
     pub fn info(&self, source: &str, message: &str){
@@ -68,15 +74,19 @@ impl ScopedLogger{
         self.logger.debug(&self.source, message);
     }
 
+    pub fn good(&self, message: &str){
+        self.logger.good(&self.source, message);
+    }
+
     pub fn info(&self, message: &str){
         self.logger.info(&self.source, message);
     }
 
-    pub fn warning(&self, message: &str){
+    pub fn warn(&self, message: &str){
         self.logger.warning(&self.source, message);
     }
 
-    pub fn error(&self, message: &str){
+    pub fn err(&self, message: &str){
         self.logger.error(&self.source, message);
     }
 }

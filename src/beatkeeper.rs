@@ -6,10 +6,17 @@ use crate::outputmodules::ModuleDefinition;
 use crate::outputmodules::OutputModule;
 use std::{marker::PhantomData, time::Duration};
 use crate::offsets::Pointer;
-use toy_arms::external::{read, Process};
-use crate::OutputModules;
+use toy_arms::external::error::TAExternalError;
+use toy_arms::external::{read, process};
+use std::mem::size_of_val;
 use crate::RekordboxOffsets;
 
+#[derive(PartialEq, Clone)]
+struct ReadError {
+    pointer: Option<Pointer>,
+    address: usize,
+    error: TAExternalError,
+}
 
 struct Value<T> {
     address: usize,
@@ -18,30 +25,42 @@ struct Value<T> {
 }
 
 impl<T> Value<T> {
-    fn new(h: HANDLE, base: usize, offsets: &Pointer) -> Value<T> {
+    fn new(h: HANDLE, base: usize, offsets: &Pointer) -> Result<Value<T>, ReadError> {
         let mut address = base;
 
         for offset in &offsets.offsets {
-            address = read::<usize>(h, address + offset)
-                .unwrap_or_else(|_| panic!("\nMemory read failed, check your Rekordbox version! Try updating with -u.\nIf nothing works, wait for an update or send this entire error message to @grufkork. \n\nBase: {base:X}, Offsets: {offsets}"));
+            println!("offset: {:X}", offset);
+            println!("address: {:X}", address);
+            println!("next: {:X}", address + offset);
+            match read::<usize>(&h, address + offset, size_of_val(offset), *offset as *mut usize){
+                Ok(val) => val,
+                Err(e) => return Err(ReadError{pointer: Some(offsets.clone()), address: address+offset, error: e}),
+            }
+                // .unwrap_or_else(|_| panic!("\nMemory read failed, check your Rekordbox version! Try updating with -u.\nIf nothing works, wait for an update or send this entire error message to @grufkork. \n\nBase: {base:X}, Offsets: {offsets}"));
         }
         address += offsets.final_offset;
 
-        Value::<T> {
+        Ok(Value::<T> {
             address,
             handle: h,
             _marker: PhantomData::<T>,
-        }
+        })
     }
-    fn pointers_to_vals(h: HANDLE, base: usize, pointers: Vec<Pointer>) -> Vec<Value<T>> {
+    fn pointers_to_vals(h: HANDLE, base: usize, pointers: Vec<Pointer>) -> Result<Vec<Value<T>>, ReadError> {
         pointers
             .iter()
-            .map(|x| Value::new(h, base, x))
+            .map(|x| {Value::new(h, base, x)})
             .collect()
     }
 
-    fn read(&self) -> T {
-        read::<T>(self.handle, self.address).unwrap()
+    fn read(&self) -> Result<T, ReadError> {
+        let mut val: T = unsafe { std::mem::zeroed::<T>() };
+        match read::<T>(&self.handle, self.address, size_of_val(&val), &mut val as *mut T){
+            Ok(()) => (),
+            Err(e) => {return Err(ReadError{pointer: None, address:self.address, error: e});},
+        }
+
+        Ok(val)
     }
 }
 
@@ -69,8 +88,8 @@ impl<T> PointerChainValue<T>{
             .collect()
     }
 
-    fn read(&self) -> T{
-        Value::<T>::new(self.handle, self.base, &self.pointer).read()
+    fn read(&self) -> Result<T, ReadError> {
+        Value::<T>::new(self.handle, self.base, &self.pointer)?.read()
     }
 }
 
@@ -91,27 +110,36 @@ pub struct Rekordbox {
 
 
 impl Rekordbox {
-    fn new(offsets: RekordboxOffsets) -> Self {
-        let rb = Process::from_process_name("rekordbox.exe")
-            .expect("Could not find Rekordbox process! ");
-        let h = rb.process_handle;
+    fn new(offsets: RekordboxOffsets) -> Result<Self, ReadError> {
+        let rb = match process::Process::from_process_name("rekordbox.exe"){
+            Ok(p) => p,
+            Err(e) => return Err(ReadError{pointer: None, address: 0, error: e}),
+        };
+        let h = rb.handle;
 
-        let base = rb.get_module_base("rekordbox.exe").unwrap();
 
-        let master_bpm_val: Value<f32> = Value::new(h, base, &offsets.master_bpm);
+        let base = match rb.get_module_base("rekordbox.exe"){
+            Ok(b) => b,
+            Err(e) => return Err(ReadError{pointer: None, address: 0, error: e}),
+        };
+        // let base = 0x300905a4d;
+        println!("base: {:X}", base);
+        // println!("base: {:?}", rb.get_module_info("rekordbox.exe").unwrap());
 
-        let original_bpms = Value::pointers_to_vals(h, base, offsets.original_bpm);
-        let beatgrid_shifts = Value::pointers_to_vals(h, base, offsets.beatgrid_shift);
-        let beatgrid_beats = Value::pointers_to_vals(h, base, offsets.beatgrid_beat);
-        let sample_positions = Value::pointers_to_vals(h, base, offsets.sample_position);
-        let sample_rates = Value::pointers_to_vals(h, base, offsets.sample_rate);
+        let master_bpm_val: Value<f32> = Value::new(h, base, &offsets.master_bpm)?;
+
+        let original_bpms = Value::pointers_to_vals(h, base, offsets.original_bpm)?;
+        let beatgrid_shifts = Value::pointers_to_vals(h, base, offsets.beatgrid_shift)?;
+        let beatgrid_beats = Value::pointers_to_vals(h, base, offsets.beatgrid_beat)?;
+        let sample_positions = Value::pointers_to_vals(h, base, offsets.sample_position)?;
+        let sample_rates = Value::pointers_to_vals(h, base, offsets.sample_rate)?;
         let track_infos = PointerChainValue::pointers_to_vals(h, base, offsets.track_info);
 
         let deckcount = beatgrid_shifts.len();
 
-        let masterdeck_index_val: Value<u8> = Value::new(h, base, &offsets.masterdeck_index);
+        let masterdeck_index_val: Value<u8> = Value::new(h, base, &offsets.masterdeck_index)?;
 
-        Self {
+        Ok(Self {
             master_bpm: master_bpm_val,
             original_bpms,
             beatgrid_seconds: beatgrid_shifts,
@@ -121,8 +149,62 @@ impl Rekordbox {
             masterdeck_index: masterdeck_index_val,
             deckcount,
             track_infos,
-        }
+        })
     }
+
+    fn read_timing_data(&self) -> Result<TimingDataRaw, ReadError> {
+        let master_bpm = self.master_bpm.read()?;
+        let masterdeck_index = self.masterdeck_index.read()?.min(self.deckcount as u8 - 1);
+        let sample_position = self.sample_positions[masterdeck_index as usize].read()?;
+        let grid_shift = self.beatgrid_seconds[masterdeck_index as usize].read()?;
+        let grid_beat = self.beatgrid_beats[masterdeck_index as usize].read()?;
+        let original_bpm = self.original_bpms[masterdeck_index as usize].read()?;
+
+        Ok(TimingDataRaw{
+            master_bpm,
+            masterdeck_index,
+            sample_position,
+            grid_shift,
+            grid_beat,
+            original_bpm
+        })
+
+    }
+
+    fn get_track_infos(&self) -> Result<Vec<TrackInfo>, ReadError> {
+        (0..self.deckcount)
+            .map(|i| {
+                let raw = self.track_infos[i]
+                    .read()?
+                    .into_iter()
+                    .take_while(|x| *x != 0x00)
+                    .collect::<Vec<u8>>();
+                let text = String::from_utf8(raw).unwrap_or("ERR".to_string());
+                let mut lines = text
+                    .lines()
+                    .map(|x| x.split_once(": ").unwrap_or(("", "")).1)
+                    .map(|x| x.to_string());
+                Ok(
+                    TrackInfo {
+                        title: lines.next().unwrap_or("".to_string()),
+                        artist: lines.next().unwrap_or("".to_string()),
+                        album: lines.next().unwrap_or("".to_string()),
+                    }
+                )
+            })
+        .collect()
+    }
+
+}
+
+struct TimingDataRaw{
+    master_bpm: f32,
+    masterdeck_index: u8,
+    sample_position: i64,
+    grid_shift: f64,
+    grid_beat: i32,
+    original_bpm: f32,
+
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -151,7 +233,6 @@ impl<T: std::cmp::PartialEq> ChangeTrackedValue<T> {
     }
     fn set(&mut self, value: T) -> bool {
         if self.value != value {
-            println!("Val changed");
             self.value = value;
             true
         } else {
@@ -161,12 +242,13 @@ impl<T: std::cmp::PartialEq> ChangeTrackedValue<T> {
 }
 
 pub struct BeatKeeper {
-    rb: Rekordbox,
     masterdeck_index: usize,
     offset_micros: f32,
     master_bpm: ChangeTrackedValue<f32>,
     running_modules: Vec<Box<dyn OutputModule>>,
     tracks: Vec<ChangeTrackedValue<TrackInfo>>,
+    logger: ScopedLogger,
+    last_error: Option<ReadError>,
 }
 
 impl BeatKeeper {
@@ -202,45 +284,104 @@ impl BeatKeeper {
         }
 
         let mut keeper = BeatKeeper {
-            rb: Rekordbox::new(offsets),
             masterdeck_index: 0,
             offset_micros: 0.,
             master_bpm: ChangeTrackedValue::new(120.),
             tracks: vec![ChangeTrackedValue::new(Default::default()); 4],
             running_modules,
+            logger: logger.clone(),
+            last_error: None,
         };
+
+        let mut rekordbox = None;
 
         let period = Duration::from_micros(1000000 / update_rate); // 50Hz
         let mut n = 0;
 
+        logger.info("Looking for Rekordbox...");
+        println!();
+
         loop {
-            keeper.update(n == 0);
-            n = (n + 1) % slow_update_denominator;
-            thread::sleep(period);
+            if let Some(rb) = &rekordbox {
+                if let Err(e) = keeper.update(rb, n == 0){
+                    keeper.report_error(e);
+                    
+                    rekordbox = None;
+                    logger.err("Connection to Rekordbox lost");
+                    logger.info("Reconnecting...");
+
+                }else{
+                    n = (n + 1) % slow_update_denominator;
+                    thread::sleep(period);
+                }
+            }else {
+                match Rekordbox::new(offsets.clone()){
+                    Ok(rb) => {
+                        rekordbox = Some(rb);
+                        println!();
+                        logger.good("Connected to Rekordbox!");
+                        keeper.last_error = None;
+                    },
+                    Err(e) => {
+                        keeper.report_error(e);
+                        logger.info("...");
+                        thread::sleep(Duration::from_secs(3));
+                    }
+                }
+            }
+
+
         }
     }
 
-    pub fn update(&mut self, slow_update: bool) -> f32 {
-        let bpm_changed = self.master_bpm.set(self.rb.master_bpm.read());
-        self.masterdeck_index = self.rb.masterdeck_index.read() as usize;
-        if self.masterdeck_index >= self.rb.deckcount {
+    fn report_error(&mut self, e: ReadError){
+        if let Some(last) = &self.last_error{
+            if e == *last{
+                return;
+            }
+        }
+        match &e.error {
+            TAExternalError::ProcessNotFound | TAExternalError::ModuleNotFound => {
+                self.logger.err("Rekordbox process not found!");
+            },
+            TAExternalError::SnapshotFailed(e) => {
+                self.logger.err(&format!("Snapshot failed: {}", e));
+                self.logger.info("    Ensure Rekordbox is running!");
+            },
+            TAExternalError::ReadMemoryFailed(e) => {
+                self.logger.err(&format!("Read memory failed: {}", e));
+                self.logger.info("    Wait for Rekordbox to start fully.");
+                self.logger.info("    If the issue persists, check your configured Rekordbox version or try updating the offsets.");
+                self.logger.info("    If nothing works, wait for an update or send this entire error message to @grufkork.");
+            },
+            TAExternalError::WriteMemoryFailed(e) => {
+                self.logger.err(&format!("Write memory failed: {}", e));
+            },
+        };
+        if let Some(p) = &e.pointer{
+            self.logger.err(&format!("Pointer: {p:?}"));
+        }
+        if e.address != 0{
+            self.logger.err(&format!("Address: {:X}", e.address));
+        }
+        self.last_error = Some(e);
+    }
+
+    pub fn update(&mut self, rb: &Rekordbox, slow_update: bool) -> Result<(), ReadError> {
+        let mut td = rb.read_timing_data()?;
+        let bpm_changed = self.master_bpm.set(td.master_bpm);
+        self.masterdeck_index = td.masterdeck_index as usize;
+        if self.masterdeck_index >= rb.deckcount {
             self.masterdeck_index = 0;
         }
 
-        // let samplerate = self.rb.sample_rates[self.masterdeck_index].read();
-        let sample_position = self.rb.sample_positions[self.masterdeck_index].read();
-        let seconds_played = sample_position as f32 / 44100.; //samplerate as f32;
+        let seconds_played = td.sample_position as f32 / 44100.; //samplerate as f32;
 
-        let grid_shift = self.rb.beatgrid_seconds[self.masterdeck_index].read();
-        let mut grid_beat = self.rb.beatgrid_beats[self.masterdeck_index].read();
-        if grid_beat < 1 {
-            grid_beat = 1;
-        }
+        td.grid_beat = td.grid_beat.max(1);
 
-        let original_bpm = self.rb.original_bpms[self.masterdeck_index].read();
-        let grid_size = 60. / original_bpm;
+        let grid_size = 60. / td.original_bpm;
 
-        let grid_origin = grid_shift as f32 + grid_beat as f32 * grid_size;
+        let grid_origin = td.grid_shift as f32 + td.grid_beat as f32 * grid_size;
 
         let beat = (seconds_played - grid_origin) / grid_size;
 
@@ -257,48 +398,29 @@ impl BeatKeeper {
                 module.bpm_changed(self.master_bpm.value);
             }
         }
-        for (i, track) in self.get_track_infos().iter().enumerate(){
-            if self.tracks[i].set(track.clone()){
-                for module in &mut self.running_modules {
-                    module.track_changed(track.clone(), i);
-                }
-                if self.masterdeck_index == i {
+
+
+        if slow_update{
+            for (i, track) in rb.get_track_infos()?.iter().enumerate(){
+                if self.tracks[i].set(track.clone()){
                     for module in &mut self.running_modules {
-                        module.master_track_changed(track.clone());
+                        module.track_changed(track.clone(), i);
+                    }
+                    if self.masterdeck_index == i {
+                        self.logger.debug(&format!("Master track changed: {:?}", track));
+                        for module in &mut self.running_modules {
+                            module.master_track_changed(track.clone());
+                        }
                     }
                 }
             }
-        }
-
-        if slow_update{
             for module in &mut self.running_modules{
                 module.slow_update();
             }
         }
 
-        beat
+        Ok(())
     }
 
-    fn get_track_infos(&self) -> Vec<TrackInfo> {
-        (0..self.rb.deckcount)
-            .map(|i| {
-                let raw = self.rb.track_infos[i]
-                    .read()
-                    .into_iter()
-                    .take_while(|x| *x != 0x00)
-                    .collect::<Vec<u8>>();
-                let text = String::from_utf8(raw).unwrap_or("ERR".to_string());
-                let mut lines = text
-                    .lines()
-                    .map(|x| x.split_once(": ").unwrap_or(("", "")).1)
-                    .map(|x| x.to_string());
-                TrackInfo {
-                    title: lines.next().unwrap_or("".to_string()),
-                    artist: lines.next().unwrap_or("".to_string()),
-                    album: lines.next().unwrap_or("".to_string()),
-                }
-            })
-        .collect()
-    }
 }
 

@@ -29,10 +29,10 @@ impl Config{
                 config.insert(key.to_string(), value.to_string());
             }
             if config.keys().len() == 0{
-                logger.warning("Configuration is empty");
+                logger.warn("Configuration is empty");
             }
         }else{
-            logger.warning("Config file not found");
+            logger.warn("Config file not found");
         };
         Config{
             entries: config,
@@ -65,7 +65,7 @@ impl Config{
                 None
             }
         }else{
-            self.logger.warning(&format!("Missing key '{}'", key));
+            self.logger.warn(&format!("Missing key '{}'", key));
             None
         }
         // match value{

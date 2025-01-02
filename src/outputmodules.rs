@@ -44,9 +44,6 @@ pub trait OutputModule {
     fn master_track_changed(&mut self, _track: TrackInfo){}
 
     fn slow_update(&mut self);
-
-    fn get_name(&self) -> String;
-    fn get_pretty_name(&self) -> String;
 }
 
 

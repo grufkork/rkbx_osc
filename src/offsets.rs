@@ -75,6 +75,7 @@ impl RekordboxOffsets {
             }
         }
 
+        println!("{:?}", map);
         Ok(map)
     }
 }
@@ -92,7 +93,7 @@ pub struct RekordboxOffsets {
     pub track_info: Vec<Pointer>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(PartialEq, Clone, Debug)]
 pub struct Pointer {
     pub offsets: Vec<usize>,
     pub final_offset: usize,

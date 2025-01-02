@@ -89,12 +89,4 @@ impl OutputModule for Osc {
             self.logger.info(&format!("Sending {} -> {}", source_addr, target_addr));
         }
     }
-
-    fn get_name(&self) -> String {
-        "osc".to_string()
-    }
-
-    fn get_pretty_name(&self) -> String {
-        "OSC".to_string()
-    }
 }

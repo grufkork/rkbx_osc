@@ -61,27 +61,13 @@ impl Config{
             if let Ok(val) = val.parse::<T>(){
                 Some(val)
             }else{
-                unimplemented!("Show parse error");
+                self.logger.err(&format!("Invalid value {val} for key '{key}'"));
                 None
             }
         }else{
-            self.logger.warn(&format!("Missing key '{}'", key));
+            self.logger.warn(&format!("Missing config key '{}'", key));
             None
         }
-        // match value{
-        //     Some(value) => {
-        //         if let Ok(value) = value.parse::<T>(){
-        //             Some(value)
-        //         }else{
-        //             unimplemented!("Show parse error");
-        //             None
-        //         }
-        //     },
-        //     None => {
-        //         println!("Config key missing: {}", key);
-        //         None
-        //     }
-        // }
     }
 
     pub fn reduce_to_namespace(&self, namespace: &str) -> Config{

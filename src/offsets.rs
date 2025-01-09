@@ -1,31 +1,29 @@
 use core::fmt;
 use std::{collections::HashMap, fs::File, io::Read};
 
-pub type RekordboxOffsetCollection = HashMap<String, RekordboxOffsets>;
+use crate::log::ScopedLogger;
 
 impl RekordboxOffsets {
-    pub fn from_lines(lines: &[String]) -> Option<RekordboxOffsets> {
+    pub fn from_lines(lines: &[String], logger: &ScopedLogger) -> Option<RekordboxOffsets> {
         let mut rows = lines.iter().peekable();
 
         let rb_version = rows.next()?.to_string();
 
-        let master_bpm = Pointer::from_string(rows.next()?);
-        let masterdeck_index = Pointer::from_string(rows.next()?);
+        let master_bpm = Pointer::from_string(rows.next()?, logger);
+        let masterdeck_index = Pointer::from_string(rows.next()?, logger);
 
         let mut beatgrid_shift = vec![];
         let mut beatgrid_beat = vec![];
         let mut sample_position = vec![];
-        let mut sample_rate = vec![];
         let mut original_bpm = vec![];
         let mut track_info = vec![];
 
         while rows.peek().is_some() {
-            original_bpm.push(Pointer::from_string(rows.next()?));
-            beatgrid_shift.push(Pointer::from_string(rows.next()?));
-            beatgrid_beat.push(Pointer::from_string(rows.next()?));
-            sample_position.push(Pointer::from_string(rows.next()?));
-            sample_rate.push(Pointer::from_string(rows.next()?));
-            track_info.push(Pointer::from_string(rows.next()?));
+            original_bpm.push(Pointer::from_string(rows.next()?, logger));
+            beatgrid_shift.push(Pointer::from_string(rows.next()?, logger));
+            beatgrid_beat.push(Pointer::from_string(rows.next()?, logger));
+            sample_position.push(Pointer::from_string(rows.next()?, logger));
+            track_info.push(Pointer::from_string(rows.next()?, logger));
         }
 
         Some(RekordboxOffsets {
@@ -33,7 +31,6 @@ impl RekordboxOffsets {
             beatgrid_shift,
             beatgrid_beat,
             sample_position,
-            sample_rate,
             original_bpm,
             master_bpm,
             masterdeck_index,
@@ -41,7 +38,7 @@ impl RekordboxOffsets {
         })
     }
 
-    pub fn from_file(name: &str) -> Result<HashMap<String, RekordboxOffsets>, String> {
+    pub fn from_file(name: &str, logger: ScopedLogger) -> Result<HashMap<String, RekordboxOffsets>, String> {
         let Ok(mut file) = File::open(name) else {
             return Err(format!("Could not open offset file {name}"));
         };
@@ -60,10 +57,10 @@ impl RekordboxOffsets {
             if line.is_empty() {
                 empty_line_count += 1;
                 if empty_line_count >= 2 && !lines.is_empty() {
-                    if let Some(offsets) = RekordboxOffsets::from_lines(&lines) {
+                    if let Some(offsets) = RekordboxOffsets::from_lines(&lines, &logger) {
                         map.insert(offsets.rbversion.clone(), offsets);
                     } else {
-                        println!("Failed to parse offsets: {lines:?}");
+                        return Err("Failed to parse offsets".to_string());
                     }
                     lines.clear();
                 }
@@ -75,7 +72,6 @@ impl RekordboxOffsets {
             }
         }
 
-        println!("{:?}", map);
         Ok(map)
     }
 }
@@ -88,7 +84,6 @@ pub struct RekordboxOffsets {
     pub beatgrid_shift: Vec<Pointer>,
     pub beatgrid_beat: Vec<Pointer>,
     pub sample_position: Vec<Pointer>,
-    pub sample_rate: Vec<Pointer>,
     pub original_bpm: Vec<Pointer>,
     pub track_info: Vec<Pointer>,
 }
@@ -107,7 +102,8 @@ impl Pointer {
         }
     }
 
-    pub fn from_string(input: &str) -> Self {
+    pub fn from_string(input: &str, logger: &ScopedLogger) -> Self {
+        logger.debug(&format!("Parsing pointer: {input}"));
         let split = input.split(' ').map(hexparse).collect::<Vec<usize>>();
         Self::new(split[0..split.len() - 1].to_vec(), *split.last().unwrap())
     }

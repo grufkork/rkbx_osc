@@ -95,7 +95,6 @@ pub struct Rekordbox {
     beatgrid_seconds: Vec<Value<f64>>,
     beatgrid_beats: Vec<Value<i32>>,
     sample_positions: Vec<Value<i64>>,
-    sample_rates: Vec<Value<u32>>,
     track_infos: Vec<PointerChainValue<[u8; 200]>>,
     deckcount: usize,
 }
@@ -122,7 +121,6 @@ impl Rekordbox {
         let beatgrid_shifts = Value::pointers_to_vals(h, base, offsets.beatgrid_shift)?;
         let beatgrid_beats = Value::pointers_to_vals(h, base, offsets.beatgrid_beat)?;
         let sample_positions = Value::pointers_to_vals(h, base, offsets.sample_position)?;
-        let sample_rates = Value::pointers_to_vals(h, base, offsets.sample_rate)?;
         let track_infos = PointerChainValue::pointers_to_vals(h, base, offsets.track_info);
 
         let deckcount = beatgrid_shifts.len();
@@ -135,7 +133,6 @@ impl Rekordbox {
             beatgrid_seconds: beatgrid_shifts,
             beatgrid_beats,
             sample_positions,
-            sample_rates,
             masterdeck_index: masterdeck_index_val,
             deckcount,
             track_infos,
@@ -343,17 +340,17 @@ impl BeatKeeper {
                 self.logger.err(&format!("Read memory failed: {}", e));
                 self.logger.info("    Wait for Rekordbox to start fully.");
                 self.logger.info("    If the issue persists, check your configured Rekordbox version or try updating the offsets.");
-                self.logger.info("    If nothing works, wait for an update or send this entire error message to @grufkork.");
+                self.logger.info("    If nothing works, wait for an update - or enable Debug in config and send this entire error message to @grufkork.");
             },
             TAExternalError::WriteMemoryFailed(e) => {
                 self.logger.err(&format!("Write memory failed: {}", e));
             },
         };
         if let Some(p) = &e.pointer{
-            self.logger.err(&format!("Pointer: {p:?}"));
+            self.logger.debug(&format!("Pointer: {p:?}"));
         }
         if e.address != 0{
-            self.logger.err(&format!("Address: {:X}", e.address));
+            self.logger.debug(&format!("Address: {:X}", e.address));
         }
         self.last_error = Some(e);
     }
@@ -367,18 +364,22 @@ impl BeatKeeper {
             self.masterdeck_index = 0;
         }
 
-        let seconds_played = td.sample_position as f32 / 44100.; //samplerate as f32;
+        // Sample position seems to always be counted as if the track is 44100Hz
+        // - even when track or audio interface is 48kHz
+        let seconds_played = td.sample_position as f32 / 44100.;
 
-        td.grid_beat = td.grid_beat.max(1);
+        // Unadjusted tracks have shift = 0. Adjusted tracks that begin on the first beat, have shift = 1
+        td.grid_beat = td.grid_beat.max(1) - 1; 
 
         let grid_size = 60. / td.original_bpm;
 
-        let grid_origin = td.grid_shift as f32 + td.grid_beat as f32 * grid_size;
+        // Grid beat is how many whole beats the grid is shifted
+        let grid_origin = td.grid_shift as f32 + td.grid_beat as f32 * grid_size; 
 
         let beat = (seconds_played - grid_origin) / grid_size;
 
 
-        // println!("beat: {}", beat);
+        println!("beat: {}", beat);
         // println!("s played: {}", seconds_played);
         // println!("origin {}", grid_origin);
         // println!("shift: {}", grid_shift);

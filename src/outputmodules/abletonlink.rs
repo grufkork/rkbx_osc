@@ -7,7 +7,8 @@ pub struct AbletonLink {
     link: AblLink,
     state: SessionState,
     last_num_links: u64,
-    logger: ScopedLogger
+    logger: ScopedLogger,
+    last_beat: f32
 }
 
 impl AbletonLink {
@@ -20,7 +21,7 @@ impl AbletonLink {
 
         link.enable(true);
 
-        Box::new(AbletonLink { link, state, last_num_links: 9999, logger})
+        Box::new(AbletonLink { link, state, last_num_links: 9999, logger, last_beat: 0.})
     }
 }
 
@@ -31,11 +32,16 @@ impl OutputModule for AbletonLink {
     }
 
     fn beat_update(&mut self, beat: f32){
+        // Let link free-wheel if not playing
+        if self.last_beat == beat {
+            return; 
+        }
         // let target_beat = (beat as f64) % 4.;
 
         self.state
-            .force_beat_at_time(beat.into(), self.link.clock_micros() as u64, 4.);
+            .request_beat_at_time(beat.into(), self.link.clock_micros(), 4.);
         self.link.commit_app_session_state(&self.state);
+        self.last_beat = beat;
     }
 
     fn slow_update(&mut self) {

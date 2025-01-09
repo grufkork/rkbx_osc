@@ -54,8 +54,9 @@ fn main() {
         update_routine(ScopedLogger::new(&logger, "Update"));
     }
 
-    let Ok(offsets) = RekordboxOffsets::from_file("offsets") else {
-        unimplemented!("Handle offset file parse error");
+    let Ok(offsets) = RekordboxOffsets::from_file("offsets", ScopedLogger::new(&logger, "Parser")) else {
+        applogger.err("Failed to parse offsets. Enable debug for details");
+        return;
     };
 
     let mut versions: Vec<String> = offsets

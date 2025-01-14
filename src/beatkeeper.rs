@@ -347,7 +347,7 @@ impl BeatKeeper {
             },
         };
         if let Some(p) = &e.pointer{
-            self.logger.debug(&format!("Pointer: {p:?}"));
+            self.logger.debug(&format!("Pointer: {p}"));
         }
         if e.address != 0{
             self.logger.debug(&format!("Address: {:X}", e.address));
@@ -369,6 +369,9 @@ impl BeatKeeper {
         let seconds_played = td.sample_position as f32 / 44100.;
 
         // Unadjusted tracks have shift = 0. Adjusted tracks that begin on the first beat, have shift = 1
+        // Or maybe not, rather it looks like:
+        // Unadjusted tracks have bar 1 = 0, adjusted tracks have bar 1 = 1
+        // So unadjusted tracks have a lowest possible beat shift of 0, adjusted have 1
         td.grid_beat = td.grid_beat.max(1) - 1; 
 
         let grid_size = 60. / td.original_bpm;
@@ -376,10 +379,14 @@ impl BeatKeeper {
         // Grid beat is how many whole beats the grid is shifted
         let grid_origin = td.grid_shift as f32 + td.grid_beat as f32 * grid_size; 
 
-        let beat = (seconds_played - grid_origin) / grid_size;
-
+        let mut beat = (seconds_played - grid_origin) / grid_size;
 
         println!("beat: {}", beat);
+        if beat.is_nan(){
+            beat = 0.0;
+        }
+
+
         // println!("s played: {}", seconds_played);
         // println!("origin {}", grid_origin);
         // println!("shift: {}", grid_shift);
@@ -395,6 +402,7 @@ impl BeatKeeper {
 
         if slow_update{
             for (i, track) in rb.get_track_infos()?.iter().enumerate(){
+                println!("{:?}", track);
                 if self.tracks[i].set(track.clone()){
                     for module in &mut self.running_modules {
                         module.track_changed(track.clone(), i);

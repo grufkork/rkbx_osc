@@ -49,7 +49,6 @@
     <CheatEntry>
       <ID>10</ID>
       <Description>"----"</Description>
-      <LastState Value="" RealAddress="00000000"/>
       <GroupHeader>1</GroupHeader>
     </CheatEntry>
     <CheatEntry>
@@ -78,7 +77,6 @@
     <CheatEntry>
       <ID>39</ID>
       <Description>"Deck 1"</Description>
-      <LastState Value="" RealAddress="00000000"/>
       <GroupHeader>1</GroupHeader>
       <CheatEntries>
         <CheatEntry>
@@ -157,7 +155,6 @@
     <CheatEntry>
       <ID>38</ID>
       <Description>"Deck 2"</Description>
-      <LastState Value="" RealAddress="00000000"/>
       <GroupHeader>1</GroupHeader>
       <Address>0</Address>
       <CheatEntries>
@@ -283,6 +280,41 @@
         <Offset>0</Offset>
         <Offset>E0</Offset>
         <Offset>838</Offset>
+      </Offsets>
+    </CheatEntry>
+    <CheatEntry>
+      <ID>75</ID>
+      <Description>"Master BPM"</Description>
+      <VariableType>Float</VariableType>
+      <Address>20161920530</Address>
+    </CheatEntry>
+    <CheatEntry>
+      <ID>76</ID>
+      <Description>"pointerscan result"</Description>
+      <VariableType>Float</VariableType>
+      <Address>"rekordbox.exe"+043F7AF0</Address>
+      <Offsets>
+        <Offset>B48</Offset>
+        <Offset>0</Offset>
+        <Offset>1C0</Offset>
+        <Offset>E8</Offset>
+      </Offsets>
+    </CheatEntry>
+    <CheatEntry>
+      <ID>77</ID>
+      <Description>"Grid shift deck 2"</Description>
+      <VariableType>4 Bytes</VariableType>
+      <Address>1CE71A40918</Address>
+    </CheatEntry>
+    <CheatEntry>
+      <ID>78</ID>
+      <Description>"Grid shift deck 2"</Description>
+      <VariableType>4 Bytes</VariableType>
+      <Address>"rekordbox.exe"+0443F630</Address>
+      <Offsets>
+        <Offset>238</Offset>
+        <Offset>300</Offset>
+        <Offset>868</Offset>
       </Offsets>
     </CheatEntry>
   </CheatEntries>

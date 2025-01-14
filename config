@@ -6,7 +6,7 @@ app.debug true
 app.repo grufkork/rekordbox_osc/rewrite
 
 # Rekordbox version to target
-keeper.rekordbox_version 6.8.5
+keeper.rekordbox_version 7.0.8
 # How often to fetch song position in Hz
 keeper.update_rate 10
 # Every nth update, perform a slow update

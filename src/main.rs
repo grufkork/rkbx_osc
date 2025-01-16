@@ -1,7 +1,7 @@
 use std::{fs, rc::Rc};
 use std::path::Path;
 use log::{Logger, ScopedLogger};
-use outputmodules::{ModuleDefinition, OutputModules};
+use outputmodules::ModuleDefinition;
 use beatkeeper::BeatKeeper;
 
 mod offsets;
@@ -14,10 +14,6 @@ mod log;
 mod beatkeeper;
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
-const REPO: &str = "grufkork/rkbx_osc/rewrite";
-
-
-const CHARS: [&str; 4] = ["|", "/", "-", "\\"];
 
 fn main() {
 
@@ -51,7 +47,7 @@ fn main() {
     }
 
     if update{
-        update_routine(ScopedLogger::new(&logger, "Update"));
+        update_routine(&config.get_or_default::<String>("app.repo", "grufkork/rekordbox/rewrite".to_string()), ScopedLogger::new(&logger, "Update"));
     }
 
     let Ok(offsets) = RekordboxOffsets::from_file("offsets", ScopedLogger::new(&logger, "Parser")) else {
@@ -94,10 +90,10 @@ fn main() {
 
 }
 
-fn update_routine(logger: ScopedLogger){
+fn update_routine(repo: &str, logger: ScopedLogger){
     logger.info("Checking for updates...");
     // Exe update
-    let Ok(new_exe_version) = get_file("version_exe") else {
+    let Ok(new_exe_version) = get_file("version_exe", repo) else {
         logger.err("Failed to fetch new executable version from repository");
         return;
     };
@@ -115,7 +111,7 @@ fn update_routine(logger: ScopedLogger){
     }
 
     // Offset update
-    let Ok(new_offset_version) = get_file("version_offsets") else {
+    let Ok(new_offset_version) = get_file("version_offsets", repo) else {
         logger.err("Failed to fetch new offset version from repository");
         return;
     };
@@ -145,7 +141,7 @@ fn update_routine(logger: ScopedLogger){
     if update_offsets{
         // Offset update available
         logger.info("Downloading offsets...");
-        if let Ok(offsets) = get_file("offsets") {
+        if let Ok(offsets) = get_file("offsets", repo) {
             std::fs::write("offsets", offsets).unwrap();
             std::fs::write("version_offsets", new_offset_version.to_string()).unwrap();
             logger.info("Offsets updated");
@@ -155,8 +151,8 @@ fn update_routine(logger: ScopedLogger){
     }
 }
 
-fn get_file(path: &str) -> Result<String, String> {
-    let url = format!("https://raw.githubusercontent.com/{REPO}/{path}");
+fn get_file(path: &str, repo: &str) -> Result<String, String> {
+    let url = format!("https://raw.githubusercontent.com/{repo}/{path}");
     let Ok(res) = reqwest::blocking::get(&url) else {
         return Err(format!("Get error: {}", &url));
     };

@@ -1,11 +1,10 @@
 use std::net::UdpSocket;
 
 use rosc::{encoder::encode, OscMessage, OscPacket};
-use winapi::shared::d3d9types::D3DSAMP_ADDRESSW;
 
 use crate::{beatkeeper::TrackInfo, config::Config, log::ScopedLogger};
 
-use super::{OutputModule};
+use super::OutputModule;
 
 pub struct Osc {
     socket: UdpSocket,

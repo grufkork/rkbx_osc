@@ -9,7 +9,6 @@ use std::{marker::PhantomData, time::Duration};
 use crate::offsets::Pointer;
 use toy_arms::external::error::TAExternalError;
 use toy_arms::external::{read, Process};
-use std::mem::size_of_val;
 use crate::RekordboxOffsets;
 
 #[derive(PartialEq, Clone)]
@@ -33,7 +32,6 @@ impl<T> Value<T> {
                 Ok(val) => val,
                 Err(e) => return Err(ReadError{pointer: Some(offsets.clone()), address: address+offset, error: e}),
             }
-                // .unwrap_or_else(|_| panic!("\nMemory read failed, check your Rekordbox version! Try updating with -u.\nIf nothing works, wait for an update or send this entire error message to @grufkork. \n\nBase: {base:X}, Offsets: {offsets}"));
         }
         address += offsets.final_offset;
 
@@ -91,12 +89,9 @@ impl<T> PointerChainValue<T>{
 
 pub struct Rekordbox {
     masterdeck_index: Value<u8>,
-    original_bpms: Vec<Value<f32>>,
     current_bpms: Vec<Value<f32>>,
     playback_speeds: Vec<Value<f32>>,
     beat_displays: Vec<Value<i32>>,
-    beatgrid_seconds: Vec<Value<f64>>,
-    beatgrid_beats: Vec<Value<i32>>,
     sample_positions: Vec<Value<i64>>,
     track_infos: Vec<PointerChainValue<[u8; 200]>>,
     deckcount: usize,
@@ -119,26 +114,20 @@ impl Rekordbox {
         };
 
 
-        let original_bpms = Value::pointers_to_vals(h, base, offsets.original_bpm)?;
         let current_bpms = Value::pointers_to_vals(h, base, offsets.current_bpm)?;
         let playback_speeds = Value::pointers_to_vals(h, base, offsets.playback_speed)?;
         let beat_displays = Value::pointers_to_vals(h, base, offsets.beat_display)?;
-        let beatgrid_shifts = Value::pointers_to_vals(h, base, offsets.beatgrid_shift)?;
-        let beatgrid_beats = Value::pointers_to_vals(h, base, offsets.beatgrid_beat)?;
         let sample_positions = Value::pointers_to_vals(h, base, offsets.sample_position)?;
         let track_infos = PointerChainValue::pointers_to_vals(h, base, offsets.track_info);
 
-        let deckcount = beatgrid_shifts.len();
+        let deckcount = current_bpms.len();
 
         let masterdeck_index_val: Value<u8> = Value::new(h, base, &offsets.masterdeck_index)?;
 
         Ok(Self {
-            original_bpms,
             current_bpms,
             playback_speeds,
             beat_displays,
-            beatgrid_seconds: beatgrid_shifts,
-            beatgrid_beats,
             sample_positions,
             masterdeck_index: masterdeck_index_val,
             deckcount,
@@ -234,7 +223,7 @@ impl<T: std::cmp::PartialEq> ChangeTrackedValue<T> {
 
 pub struct BeatKeeper {
     masterdeck_index: ChangeTrackedValue<usize>,
-    offset_micros: f32,
+    offset_samples: i64,
     bpm: ChangeTrackedValue<f32>,
     last_original_bpm: f32,
     time_since_bpm_change: Duration,
@@ -271,19 +260,12 @@ impl BeatKeeper {
             let conf = config.reduce_to_namespace(&module.config_name);
             running_modules.push((module.create)(conf, ScopedLogger::new(&logger.logger, &module.pretty_name)));
             logger.info(&format!(" - {}", module.pretty_name));
-
-            // running_modules.push((match module {
-            //     OutputModules::AbletonLink => {
-            //         outputmodules::abletonlink::AbletonLink::create(conf)
-            //     }
-            //     OutputModules::Osc => outputmodules::osc::Osc::create(conf),
-            // }, module));
         }
 
         let mut keeper = BeatKeeper {
             masterdeck_index: ChangeTrackedValue::new(0),
             time_since_bpm_change: Duration::from_secs(0),
-            offset_micros: 0.,
+            offset_samples: (keeper_config.get_or_default("delay_compensation", 0.) * 44100. / 1000.) as i64,
             bpm: ChangeTrackedValue::new(120.),
             last_original_bpm: 120.,
             tracks: vec![ChangeTrackedValue::new(Default::default()); 4],
@@ -374,48 +356,46 @@ impl BeatKeeper {
         self.last_error = Some(e);
     }
 
-    pub fn update(&mut self, rb: &Rekordbox, slow_update: bool, delta: Duration) -> Result<(), ReadError> {
+    fn update(&mut self, rb: &Rekordbox, slow_update: bool, delta: Duration) -> Result<(), ReadError> {
         let td = rb.read_timing_data()?;
-        // println!("{:?}", td);
+
         let masterdeck_index_changed = self.masterdeck_index.set(td.masterdeck_index as usize);
         if self.masterdeck_index.value >= rb.deckcount {
             self.masterdeck_index.value = 0;
         }
+
         let original_bpm = td.current_bpm / td.playback_speed;
         let original_bpm_diff = original_bpm - self.last_original_bpm;
         let bpm_changed = self.bpm.set(td.current_bpm);
         
 
+        // --- Update original BPM
         let mut original_bpm_changed = false;
 
         if original_bpm_diff.abs() > 0.001{
             // There's a delay between the value of the playback speed changing and the displayed BPM
             // changing, usually <0.1s. 
             if self.time_since_bpm_change.as_secs_f32() > 0.2 {
-                // println!("diff {}", original_bpm_diff);
-                // println!("bpm {}", td.current_bpm);
-                // println!("playback speed {}", td.playback_speed);
                 self.last_original_bpm = original_bpm;
                 original_bpm_changed = true;
             }
-
-            println!("t {}", self.time_since_bpm_change.as_secs_f32());
             self.time_since_bpm_change += delta;
         }else{
             self.time_since_bpm_change = Duration::from_secs(0);
         }
 
-        let bps = self.last_original_bpm / 60.;
-        let spb = 1. / bps;
-        let samples_per_measure = (44100. * spb) as i64 * 4;
 
+        // --- Find grid offset
         // Clear the queue if the beat grid has changed, such as if:
         // - The master track has been changed
         // - The original BPM has been changed due to dynamic beat analysis or manual adjustment
         if masterdeck_index_changed || original_bpm_changed {
-            println!("Clearing queue");
             self.new_bar_measurements.clear();
         }
+
+        let bps = self.last_original_bpm / 60.;
+        let spb = 1. / bps;
+        let samples_per_measure = (44100. * spb) as i64 * 4;
 
         let expected_posdiff = (delta.as_micros() as f32 / 1_000_000. * 44100. * td.playback_speed) as i64;
         let posdiff = td.sample_position - self.last_pos;
@@ -425,7 +405,7 @@ impl BeatKeeper {
         if self.last_beat.set(td.beat) && posdiff > 0 && expectation_error.abs() < 0.5{
             let shift = td.sample_position - posdiff/2 - ((td.beat - 1)as f32 * 44100. * spb) as i64;
             self.new_bar_measurements.push_back(shift);
-            if self.new_bar_measurements.len() > 20{
+            if self.new_bar_measurements.len() > 10{
                 self.new_bar_measurements.pop_front();
             }
 
@@ -444,7 +424,7 @@ impl BeatKeeper {
 
         // Sample position seems to always be counted as if the track is 44100Hz
         // - even when track or audio interface is 48kHz
-        let seconds_since_new_measure = (td.sample_position - self.grid_shift) as f32 / 44100.;
+        let seconds_since_new_measure = (td.sample_position - self.grid_shift + self.offset_samples) as f32 / 44100.;
         // println!("seconds since new measure: {}", seconds_since_new_measure);
         let subdivision = 4.;
 
@@ -455,16 +435,10 @@ impl BeatKeeper {
         // Unadjusted tracks have bar 1 = 0, adjusted tracks have bar 1 = 1
         // So unadjusted tracks have a lowest possible beat shift of 0, adjusted have 1
 
-        // println!("beat: {}", beat);
         if beat.is_nan(){
             beat = 0.0;
         }
 
-
-        // println!("s played: {}", seconds_played);
-        // println!("origin {}", grid_origin);
-        // println!("shift: {}", grid_shift);
-        // println!("grid beat: {}", grid_beat);
 
         for module in &mut self.running_modules {
             module.beat_update(beat);
@@ -476,7 +450,6 @@ impl BeatKeeper {
 
         if slow_update{
             for (i, track) in rb.get_track_infos()?.iter().enumerate(){
-                // println!("{:?}", track);
                 if self.tracks[i].set(track.clone()){
                     for module in &mut self.running_modules {
                         module.track_changed(track.clone(), i);

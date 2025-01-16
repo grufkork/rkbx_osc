@@ -11,6 +11,9 @@ keeper.rekordbox_version 7.0.8
 keeper.update_rate 60
 # Every nth update, perform a slow update
 keeper.slow_update_every_nth 10
+# Delay compensation in ms
+# Positive values advance the output
+keeper.delay_compensation 0
 
 
 # == Open Sound Control ==

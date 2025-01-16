@@ -1,3 +1,4 @@
+use std::collections::VecDeque;
 use std::os::windows::raw::HANDLE;
 use std::thread;
 use crate::config::Config;
@@ -89,9 +90,11 @@ impl<T> PointerChainValue<T>{
 
 
 pub struct Rekordbox {
-    master_bpm: Value<f32>,
     masterdeck_index: Value<u8>,
     original_bpms: Vec<Value<f32>>,
+    current_bpms: Vec<Value<f32>>,
+    playback_speeds: Vec<Value<f32>>,
+    beat_displays: Vec<Value<i32>>,
     beatgrid_seconds: Vec<Value<f64>>,
     beatgrid_beats: Vec<Value<i32>>,
     sample_positions: Vec<Value<i64>>,
@@ -115,9 +118,11 @@ impl Rekordbox {
             Err(e) => return Err(ReadError{pointer: None, address: 0, error: e}),
         };
 
-        let master_bpm_val: Value<f32> = Value::new(h, base, &offsets.master_bpm)?;
 
         let original_bpms = Value::pointers_to_vals(h, base, offsets.original_bpm)?;
+        let current_bpms = Value::pointers_to_vals(h, base, offsets.current_bpm)?;
+        let playback_speeds = Value::pointers_to_vals(h, base, offsets.playback_speed)?;
+        let beat_displays = Value::pointers_to_vals(h, base, offsets.beat_display)?;
         let beatgrid_shifts = Value::pointers_to_vals(h, base, offsets.beatgrid_shift)?;
         let beatgrid_beats = Value::pointers_to_vals(h, base, offsets.beatgrid_beat)?;
         let sample_positions = Value::pointers_to_vals(h, base, offsets.sample_position)?;
@@ -128,8 +133,10 @@ impl Rekordbox {
         let masterdeck_index_val: Value<u8> = Value::new(h, base, &offsets.masterdeck_index)?;
 
         Ok(Self {
-            master_bpm: master_bpm_val,
             original_bpms,
+            current_bpms,
+            playback_speeds,
+            beat_displays,
             beatgrid_seconds: beatgrid_shifts,
             beatgrid_beats,
             sample_positions,
@@ -140,20 +147,18 @@ impl Rekordbox {
     }
 
     fn read_timing_data(&self) -> Result<TimingDataRaw, ReadError> {
-        let master_bpm = self.master_bpm.read()?;
         let masterdeck_index = self.masterdeck_index.read()?.min(self.deckcount as u8 - 1);
         let sample_position = self.sample_positions[masterdeck_index as usize].read()?;
-        let grid_shift = self.beatgrid_seconds[masterdeck_index as usize].read()?;
-        let grid_beat = self.beatgrid_beats[masterdeck_index as usize].read()?;
-        let original_bpm = self.original_bpms[masterdeck_index as usize].read()?;
+        let beat = self.beat_displays[masterdeck_index as usize].read()?;
+        let current_bpm = self.current_bpms[masterdeck_index as usize].read()?;
+        let playback_speed = self.playback_speeds[masterdeck_index as usize].read()?;
 
         Ok(TimingDataRaw{
-            master_bpm,
+            current_bpm,
             masterdeck_index,
             sample_position,
-            grid_shift,
-            grid_beat,
-            original_bpm
+            playback_speed,
+            beat
         })
 
     }
@@ -186,13 +191,11 @@ impl Rekordbox {
 
 #[derive(Debug)]
 struct TimingDataRaw{
-    master_bpm: f32,
+    current_bpm: f32,
     masterdeck_index: u8,
     sample_position: i64,
-    grid_shift: f64, // seconds shifted from the beat
-    grid_beat: i32, // # of beats shifted
-    original_bpm: f32,
-
+    beat: i32,
+    playback_speed: f32,
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -230,9 +233,15 @@ impl<T: std::cmp::PartialEq> ChangeTrackedValue<T> {
 }
 
 pub struct BeatKeeper {
-    masterdeck_index: usize,
+    masterdeck_index: ChangeTrackedValue<usize>,
     offset_micros: f32,
-    master_bpm: ChangeTrackedValue<f32>,
+    bpm: ChangeTrackedValue<f32>,
+    last_original_bpm: f32,
+    time_since_bpm_change: Duration,
+    last_beat: ChangeTrackedValue<i32>,
+    last_pos: i64,
+    grid_shift: i64,
+    new_bar_measurements: VecDeque<i64>,
     running_modules: Vec<Box<dyn OutputModule>>,
     tracks: Vec<ChangeTrackedValue<TrackInfo>>,
     logger: ScopedLogger,
@@ -272,13 +281,19 @@ impl BeatKeeper {
         }
 
         let mut keeper = BeatKeeper {
-            masterdeck_index: 0,
+            masterdeck_index: ChangeTrackedValue::new(0),
+            time_since_bpm_change: Duration::from_secs(0),
             offset_micros: 0.,
-            master_bpm: ChangeTrackedValue::new(120.),
+            bpm: ChangeTrackedValue::new(120.),
+            last_original_bpm: 120.,
             tracks: vec![ChangeTrackedValue::new(Default::default()); 4],
             running_modules,
             logger: logger.clone(),
             last_error: None,
+            last_beat: ChangeTrackedValue::new(1),
+            last_pos: 0,
+            grid_shift: 0,
+            new_bar_measurements: VecDeque::new(),
         };
 
         let mut rekordbox = None;
@@ -289,9 +304,12 @@ impl BeatKeeper {
         logger.info("Looking for Rekordbox...");
         println!();
 
+        let mut last_time = std::time::Instant::now();
+
         loop {
             if let Some(rb) = &rekordbox {
-                if let Err(e) = keeper.update(rb, n == 0){
+                let update_start_time = std::time::Instant::now();
+                if let Err(e) = keeper.update(rb, n == 0, last_time.elapsed()) {
                     keeper.report_error(e);
                     
                     rekordbox = None;
@@ -300,7 +318,8 @@ impl BeatKeeper {
 
                 }else{
                     n = (n + 1) % slow_update_denominator;
-                    thread::sleep(period);
+                    last_time = update_start_time;
+                    thread::sleep(period - update_start_time.elapsed());
                 }
             }else {
                 match Rekordbox::new(offsets.clone()){
@@ -355,33 +374,88 @@ impl BeatKeeper {
         self.last_error = Some(e);
     }
 
-    pub fn update(&mut self, rb: &Rekordbox, slow_update: bool) -> Result<(), ReadError> {
-        let mut td = rb.read_timing_data()?;
-        println!("{:?}", td);
-        let bpm_changed = self.master_bpm.set(td.master_bpm);
-        self.masterdeck_index = td.masterdeck_index as usize;
-        if self.masterdeck_index >= rb.deckcount {
-            self.masterdeck_index = 0;
+    pub fn update(&mut self, rb: &Rekordbox, slow_update: bool, delta: Duration) -> Result<(), ReadError> {
+        let td = rb.read_timing_data()?;
+        // println!("{:?}", td);
+        let masterdeck_index_changed = self.masterdeck_index.set(td.masterdeck_index as usize);
+        if self.masterdeck_index.value >= rb.deckcount {
+            self.masterdeck_index.value = 0;
         }
+        let original_bpm = td.current_bpm / td.playback_speed;
+        let original_bpm_diff = original_bpm - self.last_original_bpm;
+        let bpm_changed = self.bpm.set(td.current_bpm);
+        
+
+        let mut original_bpm_changed = false;
+
+        if original_bpm_diff.abs() > 0.001{
+            // There's a delay between the value of the playback speed changing and the displayed BPM
+            // changing, usually <0.1s. 
+            if self.time_since_bpm_change.as_secs_f32() > 0.2 {
+                // println!("diff {}", original_bpm_diff);
+                // println!("bpm {}", td.current_bpm);
+                // println!("playback speed {}", td.playback_speed);
+                self.last_original_bpm = original_bpm;
+                original_bpm_changed = true;
+            }
+
+            println!("t {}", self.time_since_bpm_change.as_secs_f32());
+            self.time_since_bpm_change += delta;
+        }else{
+            self.time_since_bpm_change = Duration::from_secs(0);
+        }
+
+        let bps = self.last_original_bpm / 60.;
+        let spb = 1. / bps;
+        let samples_per_measure = (44100. * spb) as i64 * 4;
+
+        // Clear the queue if the beat grid has changed, such as if:
+        // - The master track has been changed
+        // - The original BPM has been changed due to dynamic beat analysis or manual adjustment
+        if masterdeck_index_changed || original_bpm_changed {
+            println!("Clearing queue");
+            self.new_bar_measurements.clear();
+        }
+
+        let expected_posdiff = (delta.as_micros() as f32 / 1_000_000. * 44100. * td.playback_speed) as i64;
+        let posdiff = td.sample_position - self.last_pos;
+        self.last_pos = td.sample_position;
+        let expectation_error = (expected_posdiff - posdiff) as f32/expected_posdiff as f32;
+        
+        if self.last_beat.set(td.beat) && posdiff > 0 && expectation_error.abs() < 0.5{
+            let shift = td.sample_position - posdiff/2 - ((td.beat - 1)as f32 * 44100. * spb) as i64;
+            self.new_bar_measurements.push_back(shift);
+            if self.new_bar_measurements.len() > 20{
+                self.new_bar_measurements.pop_front();
+            }
+
+
+            // To avoid the seam problem when moduloing the values, center all measurements with
+            // the assumption that the first value is good enough (should be +/- 1/update rate wrong)
+            // This means that the queue must be cleared at any discontinuity in original BPM and
+            // that any erroneous measurements must be filtered by looking at the change in playback
+            // position
+            let phase_shift_guess = samples_per_measure / 2 - self.new_bar_measurements.front().unwrap() % samples_per_measure;
+            self.grid_shift = self.new_bar_measurements.iter().map(|x| (x + phase_shift_guess) % samples_per_measure).sum::<i64>() / self.new_bar_measurements.len() as i64 - phase_shift_guess;
+
+        }
+
+
 
         // Sample position seems to always be counted as if the track is 44100Hz
         // - even when track or audio interface is 48kHz
-        let seconds_played = td.sample_position as f32 / 44100.;
+        let seconds_since_new_measure = (td.sample_position - self.grid_shift) as f32 / 44100.;
+        // println!("seconds since new measure: {}", seconds_since_new_measure);
+        let subdivision = 4.;
+
+        let mut beat = (seconds_since_new_measure % (subdivision * spb)) * bps;
 
         // Unadjusted tracks have shift = 0. Adjusted tracks that begin on the first beat, have shift = 1
         // Or maybe not, rather it looks like:
         // Unadjusted tracks have bar 1 = 0, adjusted tracks have bar 1 = 1
         // So unadjusted tracks have a lowest possible beat shift of 0, adjusted have 1
-        td.grid_beat = td.grid_beat.max(1) - 1; 
 
-        let grid_size = 60. / td.original_bpm;
-
-        // Grid beat is how many whole beats the grid is shifted
-        let grid_origin = td.grid_shift as f32 + td.grid_beat as f32 * grid_size; 
-
-        let mut beat = (seconds_played - grid_origin) / grid_size;
-
-        println!("beat: {}", beat);
+        // println!("beat: {}", beat);
         if beat.is_nan(){
             beat = 0.0;
         }
@@ -395,19 +469,19 @@ impl BeatKeeper {
         for module in &mut self.running_modules {
             module.beat_update(beat);
             if bpm_changed {
-                module.bpm_changed(self.master_bpm.value);
+                module.bpm_changed(self.bpm.value);
             }
         }
 
 
         if slow_update{
             for (i, track) in rb.get_track_infos()?.iter().enumerate(){
-                println!("{:?}", track);
+                // println!("{:?}", track);
                 if self.tracks[i].set(track.clone()){
                     for module in &mut self.running_modules {
                         module.track_changed(track.clone(), i);
                     }
-                    if self.masterdeck_index == i {
+                    if self.masterdeck_index.value == i {
                         self.logger.debug(&format!("Master track changed: {:?}", track));
                         for module in &mut self.running_modules {
                             module.master_track_changed(track.clone());

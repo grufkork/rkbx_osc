@@ -9,20 +9,34 @@ impl RekordboxOffsets {
 
         let rb_version = rows.next()?.to_string();
 
-        let master_bpm = Pointer::from_string(rows.next()?, logger);
+        logger.debug("Masterdeck index");
         let masterdeck_index = Pointer::from_string(rows.next()?, logger);
 
         let mut beatgrid_shift = vec![];
         let mut beatgrid_beat = vec![];
         let mut sample_position = vec![];
         let mut original_bpm = vec![];
+        let mut current_bpm = vec![];
+        let mut playback_speed = vec![];
+        let mut beat_display = vec![];
         let mut track_info = vec![];
 
         while rows.peek().is_some() {
+            logger.debug("Oiriginal BPM");
             original_bpm.push(Pointer::from_string(rows.next()?, logger));
+            logger.debug("Current BPM");
+            current_bpm.push(Pointer::from_string(rows.next()?, logger));
+            logger.debug("Beat display");
+            beat_display.push(Pointer::from_string(rows.next()?, logger));
+            logger.debug("Playback speed");
+            playback_speed.push(Pointer::from_string(rows.next()?, logger));
+            logger.debug("Beatgrid shift");
             beatgrid_shift.push(Pointer::from_string(rows.next()?, logger));
+            logger.debug("Beatgrid beat");
             beatgrid_beat.push(Pointer::from_string(rows.next()?, logger));
+            logger.debug("Sample position");
             sample_position.push(Pointer::from_string(rows.next()?, logger));
+            logger.debug("Track info");
             track_info.push(Pointer::from_string(rows.next()?, logger));
         }
 
@@ -30,9 +44,11 @@ impl RekordboxOffsets {
             rbversion: rb_version,
             beatgrid_shift,
             beatgrid_beat,
+            beat_display,
             sample_position,
             original_bpm,
-            master_bpm,
+            current_bpm,
+            playback_speed,
             masterdeck_index,
             track_info,
         })
@@ -79,12 +95,14 @@ impl RekordboxOffsets {
 #[derive(Clone, Debug)]
 pub struct RekordboxOffsets {
     pub rbversion: String,
-    pub master_bpm: Pointer,
     pub masterdeck_index: Pointer,
     pub beatgrid_shift: Vec<Pointer>,
     pub beatgrid_beat: Vec<Pointer>,
     pub sample_position: Vec<Pointer>,
     pub original_bpm: Vec<Pointer>,
+    pub current_bpm: Vec<Pointer>,
+    pub playback_speed: Vec<Pointer>,
+    pub beat_display: Vec<Pointer>,
     pub track_info: Vec<Pointer>,
 }
 

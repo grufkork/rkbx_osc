@@ -13,5 +13,4 @@ toy-arms = { git = "https://github.com/grufkork/toy-arms", branch = "0.9.4", fea
 winapi = "0.3.9"
 rosc = "0.10.1"
 rusty_link = "0.4.2"
-iced = {version = "0.12.1", features =["advanced"] }
 reqwest = {version = "0.12.7", features = ["blocking"]}

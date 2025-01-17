@@ -3,7 +3,7 @@ app.auto_update true
 # Show debug logs
 app.debug true
 # Where to fetch updates from
-app.repo grufkork/rekordbox_osc/rewrite
+app.repo grufkork/rkbx_osc/rewrite
 
 # Rekordbox version to target
 keeper.rekordbox_version 7.0.8

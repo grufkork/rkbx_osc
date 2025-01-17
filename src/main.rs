@@ -47,7 +47,7 @@ fn main() {
     }
 
     if update{
-        update_routine(&config.get_or_default::<String>("app.repo", "grufkork/rekordbox/rewrite".to_string()), ScopedLogger::new(&logger, "Update"));
+        update_routine(&config.get_or_default::<String>("app.repo", "grufkork/rkbx_osc".to_string()), ScopedLogger::new(&logger, "Update"));
     }
 
     let Ok(offsets) = RekordboxOffsets::from_file("offsets", ScopedLogger::new(&logger, "Parser")) else {

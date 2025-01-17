@@ -10,6 +10,7 @@ use crate::offsets::Pointer;
 use toy_arms::external::error::TAExternalError;
 use toy_arms::external::{read, Process};
 use crate::RekordboxOffsets;
+use winapi::ctypes::c_void;
 
 #[derive(PartialEq, Clone)]
 struct ReadError {
@@ -19,12 +20,12 @@ struct ReadError {
 }
 struct Value<T> {
     address: usize,
-    handle: HANDLE,
+    handle: *mut c_void,
     _marker: PhantomData<T>,
 }
 
 impl<T> Value<T> {
-    fn new(h: HANDLE, base: usize, offsets: &Pointer) -> Result<Value<T>, ReadError> {
+    fn new(h: *mut c_void, base: usize, offsets: &Pointer) -> Result<Value<T>, ReadError> {
         let mut address = base;
 
         for offset in &offsets.offsets {
@@ -41,7 +42,7 @@ impl<T> Value<T> {
             _marker: PhantomData::<T>,
         })
     }
-    fn pointers_to_vals(h: HANDLE, base: usize, pointers: Vec<Pointer>) -> Result<Vec<Value<T>>, ReadError> {
+    fn pointers_to_vals(h: *mut c_void, base: usize, pointers: Vec<Pointer>) -> Result<Vec<Value<T>>, ReadError> {
         pointers
             .iter()
             .map(|x| {Value::new(h, base, x)})
@@ -57,14 +58,14 @@ impl<T> Value<T> {
 }
 
 struct PointerChainValue<T> {
-    handle: HANDLE,
+    handle: *mut c_void,
     base: usize,
     pointer: Pointer,
     _marker: PhantomData<T>,
 }
 
 impl<T> PointerChainValue<T>{
-    fn new(h: HANDLE, base: usize, pointer: Pointer) -> PointerChainValue<T>{
+    fn new(h: *mut c_void, base: usize, pointer: Pointer) -> PointerChainValue<T>{
         Self{
             handle: h,
             base,
@@ -73,7 +74,7 @@ impl<T> PointerChainValue<T>{
         }
     }
 
-    fn pointers_to_vals(h: HANDLE, base: usize, pointers: Vec<Pointer>) -> Vec<PointerChainValue<T>> {
+    fn pointers_to_vals(h: *mut c_void, base: usize, pointers: Vec<Pointer>) -> Vec<PointerChainValue<T>> {
         pointers
             .iter()
             .map(|x| PointerChainValue::new(h, base, x.clone()))
@@ -301,7 +302,9 @@ impl BeatKeeper {
                 }else{
                     n = (n + 1) % slow_update_denominator;
                     last_time = update_start_time;
-                    thread::sleep(period - update_start_time.elapsed());
+                    if period > update_start_time.elapsed(){
+                        thread::sleep(period - update_start_time.elapsed());
+                    }
                 }
             }else {
                 match Rekordbox::new(offsets.clone()){

@@ -1,9 +1,9 @@
 [package]
-name = "rkbx_osc"
+name = "rkbx_link"
 version = "0.3.2"
 edition = "2021"
 authors = ["grufkork"]
-repository = "https://github.com/grufkork/rkbx_osc"
+repository = "https://github.com/grufkork/rkbx_link"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 

@@ -20,8 +20,9 @@ fn main() {
     println!();
     println!("=====================");
     println!("Rekordbox Link v{}", VERSION);
-    println!("Repo     https://github.com/grufkork/rkbx_osc");
+    println!("Repo     https://github.com/grufkork/rkbx_link");
     println!("Updates  [BUY/DOWNLOAD LINK HERE]");
+    println!("Missing a feature? Spotted a bug? Just shoot me a message!");
     println!("=====================");
     println!();
 
@@ -37,6 +38,7 @@ fn main() {
     let modules = vec![
         ModuleDefinition::new("link", "Ableton Link", outputmodules::abletonlink::AbletonLink::create),
         ModuleDefinition::new("osc", "OSC", outputmodules::osc::Osc::create),
+        ModuleDefinition::new("file", "File", outputmodules::file::File::create),
     ];
 
 
@@ -47,7 +49,7 @@ fn main() {
     }
 
     if update{
-        update_routine(&config.get_or_default::<String>("app.repo", "grufkork/rkbx_osc".to_string()), ScopedLogger::new(&logger, "Update"));
+        update_routine(&config.get_or_default::<String>("app.repo", "grufkork/rkbx_link".to_string()), ScopedLogger::new(&logger, "Update"));
     }
 
     let Ok(offsets) = RekordboxOffsets::from_file("offsets", ScopedLogger::new(&logger, "Parser")) else {

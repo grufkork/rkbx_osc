@@ -4,6 +4,7 @@ use crate::log::ScopedLogger;
 
 pub mod abletonlink;
 pub mod osc;
+pub mod file;
 
 
 pub trait OutputModule {
@@ -11,9 +12,9 @@ pub trait OutputModule {
     fn beat_update(&mut self, _beat: f32){}
 
     fn track_changed(&mut self, _track: TrackInfo, _deck: usize){}
-    fn master_track_changed(&mut self, _track: TrackInfo){}
+    fn master_track_changed(&mut self, _track: &TrackInfo){}
 
-    fn slow_update(&mut self);
+    fn slow_update(&mut self) {}
 }
 
 

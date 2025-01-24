@@ -1,5 +1,4 @@
 use std::collections::VecDeque;
-use std::os::windows::raw::HANDLE;
 use std::thread;
 use crate::config::Config;
 use crate::log::ScopedLogger;
@@ -257,10 +256,10 @@ impl BeatKeeper {
             if !config.get_or_default(&format!("{}.enabled", module.config_name), false) {
                 continue;
             }
+            logger.info(&format!(" - {}", module.pretty_name));
 
             let conf = config.reduce_to_namespace(&module.config_name);
             running_modules.push((module.create)(conf, ScopedLogger::new(&logger.logger, &module.pretty_name)));
-            logger.info(&format!(" - {}", module.pretty_name));
         }
 
         let mut keeper = BeatKeeper {
@@ -342,7 +341,7 @@ impl BeatKeeper {
             },
             TAExternalError::ReadMemoryFailed(e) => {
                 self.logger.err(&format!("Read memory failed: {}", e));
-                self.logger.info("    Wait for Rekordbox to start fully.");
+                self.logger.info("    Check your Rekordbox version, or just wait for Rekordbox to start fully.");
                 self.logger.info("    If the issue persists, check your configured Rekordbox version or try updating the offsets.");
                 self.logger.info("    If nothing works, wait for an update - or enable Debug in config and send this entire error message to @grufkork.");
             },
@@ -460,7 +459,7 @@ impl BeatKeeper {
                     if self.masterdeck_index.value == i {
                         self.logger.debug(&format!("Master track changed: {:?}", track));
                         for module in &mut self.running_modules {
-                            module.master_track_changed(track.clone());
+                            module.master_track_changed(track);
                         }
                     }
                 }
@@ -468,6 +467,15 @@ impl BeatKeeper {
             for module in &mut self.running_modules{
                 module.slow_update();
             }
+        }
+
+        if masterdeck_index_changed{
+            let track = &self.tracks[self.masterdeck_index.value].value;
+            self.logger.debug(&format!("Master track changed: {:?}", track));
+            for module in &mut self.running_modules {
+                module.master_track_changed(track);
+            }
+
         }
 
         Ok(())

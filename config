@@ -3,7 +3,7 @@ app.auto_update true
 # Show debug logs
 app.debug true
 # Where to fetch updates from
-app.repo grufkork/rkbx_osc/rewrite
+app.repo grufkork/rkbx_link/rewrite
 
 # Rekordbox version to target
 keeper.rekordbox_version 7.0.8
@@ -17,7 +17,7 @@ keeper.delay_compensation 0
 
 
 # == Open Sound Control ==
-osc.enabled true
+osc.enabled false
 # Local address to bind to
 osc.source 127.0.0.1:4450
 # Remore address to send to
@@ -25,3 +25,9 @@ osc.destination 127.0.0.1:4460
 
 # == Ableton Link ==
 link.enabled true
+
+
+# == File output ==
+file.enabled false
+# Path to write to
+file.filename current_track.txt

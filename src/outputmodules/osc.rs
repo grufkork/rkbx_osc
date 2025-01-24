@@ -64,7 +64,7 @@ impl OutputModule for Osc {
         self.send_string(&format!("/track/{deck}/album"), &track.album);
     }
 
-    fn master_track_changed(&mut self, track: TrackInfo){
+    fn master_track_changed(&mut self, track: &TrackInfo){
         self.send_string("/track/master/title", &track.title);
         self.send_string("/track/master/artist", &track.artist);
         self.send_string("/track/master/album", &track.album);

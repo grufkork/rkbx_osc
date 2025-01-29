@@ -450,18 +450,15 @@ impl BeatKeeper {
         }
 
 
+        let mut masterdeck_track_changed = false;
+
         if slow_update{
             for (i, track) in rb.get_track_infos()?.iter().enumerate(){
                 if self.tracks[i].set(track.clone()){
                     for module in &mut self.running_modules {
                         module.track_changed(track.clone(), i);
                     }
-                    if self.masterdeck_index.value == i {
-                        self.logger.debug(&format!("Master track changed: {:?}", track));
-                        for module in &mut self.running_modules {
-                            module.master_track_changed(track);
-                        }
-                    }
+                    masterdeck_track_changed |= self.masterdeck_index.value == i;
                 }
             }
             for module in &mut self.running_modules{
@@ -469,7 +466,7 @@ impl BeatKeeper {
             }
         }
 
-        if masterdeck_index_changed{
+        if masterdeck_index_changed || masterdeck_track_changed {
             let track = &self.tracks[self.masterdeck_index.value].value;
             self.logger.debug(&format!("Master track changed: {:?}", track));
             for module in &mut self.running_modules {

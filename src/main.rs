@@ -39,6 +39,7 @@ fn main() {
         ModuleDefinition::new("link", "Ableton Link", outputmodules::abletonlink::AbletonLink::create),
         ModuleDefinition::new("osc", "OSC", outputmodules::osc::Osc::create),
         ModuleDefinition::new("file", "File", outputmodules::file::File::create),
+        ModuleDefinition::new("setlist", "Setlist", outputmodules::setlist::Setlist::create),
     ];
 
 

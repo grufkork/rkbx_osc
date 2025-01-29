@@ -1,7 +1,7 @@
 # Check for updates at startup
 app.auto_update true
 # Show debug logs
-app.debug true
+app.debug false
 # Where to fetch updates from
 app.repo grufkork/rkbx_link/rewrite
 
@@ -27,7 +27,14 @@ osc.destination 127.0.0.1:4460
 link.enabled true
 
 
-# == File output ==
+# == Write current track to file ==
 file.enabled false
 # Path to write to
 file.filename current_track.txt
+
+# == Setlist logging with timestamps ==
+setlist.enabled true
+# Artist - Track separator symbol
+setlist.separator -
+# Path to write to
+setlist.filename setlist.txt

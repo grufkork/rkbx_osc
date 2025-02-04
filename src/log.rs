@@ -1,23 +1,36 @@
-use std::rc::Rc;
-
+use std::{cell::RefCell, rc::Rc};
+use termcolor::{ColorChoice, ColorSpec, StandardStream, WriteColor};
+use std::io::Write;
 
 #[derive(PartialEq)]
 pub enum LogLevel {
-    Debug,
-    Good,
-    Info,
-    Warning,
-    Error,
+    Debug = 0,
+    Good = 1,
+    Info = 2,
+    Warning = 3,
+    Error = 4,
 }
 
-#[derive(Clone)]
 pub struct Logger {
     pub debug_enabled: bool,
+    stdout: RefCell<StandardStream>,
+    colours: [ColorSpec; 5]
 }
 
 impl Logger{
     pub fn new(debug: bool) -> Self{
-        Logger{debug_enabled: debug}
+        let mut colours = core::array::from_fn(|_| ColorSpec::new());
+        colours[0].set_fg(Some(termcolor::Color::Cyan));
+        colours[1].set_fg(Some(termcolor::Color::Green));
+        colours[2].set_fg(Some(termcolor::Color::White));
+        colours[3].set_fg(Some(termcolor::Color::Yellow));
+        colours[4].set_fg(Some(termcolor::Color::Red));
+
+        Logger{
+            colours,
+            debug_enabled: debug,
+            stdout: RefCell::new(StandardStream::stdout(ColorChoice::Always))
+        }
     }
 
     pub fn log(&self, source: &str, message: &str, level: LogLevel){
@@ -25,17 +38,12 @@ impl Logger{
             return;
         }
 
-        let esc ="\x1b[";
-        let rst = "\x1b[0m";
 
-        let format = match level{
-            LogLevel::Debug => format!("{esc}34m"),
-            LogLevel::Good => format!("{esc}32m"),
-            LogLevel::Info => format!("{esc}37m"),
-            LogLevel::Warning => format!("{esc}33m"),
-            LogLevel::Error => format!("{esc}31m"),
-        };
-        println!("{}[{}]  {}{rst}", format, source, message);
+        
+        self.stdout.borrow_mut().set_color(&self.colours[level as usize]).unwrap();
+        if writeln!(&mut self.stdout.borrow_mut(), "[{}]  {}", source, message).is_err(){
+            println!("Log failed: [{}]  {}", source, message);
+        }
     }
 
     pub fn debug(&self, source: &str, message: &str){

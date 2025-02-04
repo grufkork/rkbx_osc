@@ -33,7 +33,7 @@ file.enabled false
 file.filename current_track.txt
 
 # == Setlist logging with timestamps ==
-setlist.enabled true
+setlist.enabled false
 # Artist - Track separator symbol
 setlist.separator -
 # Path to write to
